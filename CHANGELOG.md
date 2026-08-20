@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.10 — 2026-08-20
+
+- The install script sets up the PATH for whichever shell you actually use.
+  It wrote the `export` line into the files the Bourne shells read, which left
+  out fish and nushell — neither spells a PATH that way — and tcsh, and it only
+  appended to files that already existed, so a zsh user who had never made a
+  `~/.zshrc` was told the binary was installed and then could not run it. Each
+  shell now gets its own file and its own syntax: `fish_add_path` for fish, a
+  list for nushell, `setenv` for tcsh, `export` for the rest, and the file of
+  the shell you are in is created when it is not there. Verified against bash,
+  zsh, fish, tcsh, nushell and dash. Running the script twice still leaves one
+  line.
+
 ## v0.1.9 — 2026-08-20
 
 - The install script puts cupstui on the PATH instead of only saying how. It

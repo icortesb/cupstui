@@ -70,12 +70,13 @@ case ":$PATH:" in
 esac
 
 line="export PATH=\"$dir:\$PATH\""
+conf=${XDG_CONFIG_HOME:-$HOME/.config}
 
 manual() {
 	echo "cupstui $tag is in $dir, which is not on your PATH."
 	echo "Put this line in your shell's startup file, then open a new shell:"
 	echo
-	echo "  $line"
+	echo "  ${1:-$line}"
 }
 
 # Printing the line and leaving it at that ends in "command not found", which
@@ -86,33 +87,65 @@ if [ -n "${CUPSTUI_NO_MODIFY_PATH:-}" ]; then
 	exit 0
 fi
 
-# Every startup file the user actually has, so a bash user who later opens zsh
-# still finds the binary. A file already mentioning the directory is left
-# alone: running this script twice should not stack up lines.
-written=
-for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
-	[ -f "$rc" ] || continue
-	if grep -qF "$dir" "$rc" 2>/dev/null; then
-		written="$written $rc"
-		continue
+# startup_file and path_line say where a shell reads its configuration from and
+# how it spells "put this directory first". fish keeps a command for it, and
+# nushell's PATH is a list rather than a string, so neither takes the export
+# line the Bourne shells do.
+startup_file() {
+	case $1 in
+		*/fish) echo "$conf/fish/config.fish" ;;
+		*/nu) echo "$conf/nushell/env.nu" ;;
+		*csh) echo "$HOME/.tcshrc" ;;
+		*/zsh) echo "${ZDOTDIR:-$HOME}/.zshrc" ;;
+		*/bash) echo "$HOME/.bashrc" ;;
+		*) echo "$HOME/.profile" ;;
+	esac
+}
+
+path_line() {
+	case $1 in
+		*/fish) echo "fish_add_path $dir" ;;
+		*/nu) echo "\$env.PATH = (\$env.PATH | prepend '$dir')" ;;
+		*csh) echo "setenv PATH \"$dir:\${PATH}\"" ;;
+		*) echo "$line" ;;
+	esac
+}
+
+# A file already naming the directory is left alone, so running this twice does
+# not stack up a second copy.
+add_shell() {
+	if grep -qF "$dir" "$1" 2>/dev/null; then
+		written="$written $1"
+		return 0
 	fi
-	printf '\n# added by cupstui install.sh\n%s\n' "$line" >> "$rc" 2>/dev/null &&
-		written="$written $rc"
+	mkdir -p "${1%/*}" 2>/dev/null || return 1
+	printf '\n# added by cupstui install.sh\n%s\n' "$2" >> "$1" 2>/dev/null || return 1
+	written="$written $1"
+}
+
+written=
+# The login shell's own file is written whether or not it exists yet: a zsh
+# user who has never made a ~/.zshrc still needs one for this.
+own=$(startup_file "${SHELL:-/bin/sh}")
+ownline=$(path_line "${SHELL:-/bin/sh}")
+add_shell "$own" "$ownline" || :
+
+# The files of the other shells are only appended to when they already exist,
+# so someone who moves between shells keeps finding the binary, while nobody
+# grows a configuration for a shell they never open.
+for other in /bin/bash /bin/zsh /bin/fish /bin/nu /bin/csh /bin/sh; do
+	rc=$(startup_file "$other")
+	[ "$rc" = "$own" ] && continue
+	[ -f "$rc" ] || continue
+	add_shell "$rc" "$(path_line "$other")" || :
 done
 
-# With no startup file at all, ~/.profile is the one every POSIX login shell
-# reads.
-if [ -z "$written" ] &&
-	printf '\n# added by cupstui install.sh\n%s\n' "$line" >> "$HOME/.profile" 2>/dev/null; then
-	written=" $HOME/.profile"
-fi
-
 if [ -z "$written" ]; then
-	manual
+	manual "$ownline"
 	exit 0
 fi
 
 echo "cupstui $tag is in $dir, and the PATH line was added to:$written"
 echo "Open a new shell, or run this in the current one:"
 echo
-echo "  $line"
+echo "  $ownline"
