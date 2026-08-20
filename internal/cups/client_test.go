@@ -205,9 +205,14 @@ func TestReleaseJobSendsReleaseJobOperation(t *testing.T) {
 }
 
 func TestJobActionErrorsAreClassified(t *testing.T) {
-	f := &fakeAdapter{err: ipp.HTTPError{Code: 401}}
+	f := &fakeAdapter{err: ipp.HTTPError{Code: 403}}
 	var cerr *Error
 	if err := newTestClient(f).HoldJob(1); !errors.As(err, &cerr) || cerr.Kind != KindForbidden {
 		t.Errorf("want KindForbidden, got %v", err)
+	}
+
+	f = &fakeAdapter{err: ipp.HTTPError{Code: 401}}
+	if err := newTestClient(f).HoldJob(1); !errors.As(err, &cerr) || cerr.Kind != KindUnauthorized {
+		t.Errorf("want KindUnauthorized, got %v", err)
 	}
 }

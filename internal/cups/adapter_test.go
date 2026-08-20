@@ -17,6 +17,8 @@ import (
 type fakeCUPS struct {
 	socket      string
 	connections *int64
+	requests    *int64
+	challenges  *int64        // answer 401 this many times before serving
 	headers     *atomic.Value // http.Header of the last request
 }
 
@@ -33,11 +35,11 @@ func startFakeCUPS(t *testing.T) *fakeCUPS {
 	sock := filepath.Join(t.TempDir(), "c.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
-		t.Fatalf("no se pudo abrir el socket falso: %v", err)
+		t.Fatalf("could not open the fake socket: %v", err)
 	}
 	t.Cleanup(func() { ln.Close() })
 
-	var conns int64
+	var conns, reqs, challenges int64
 	var headers atomic.Value
 	headers.Store(http.Header{})
 	srv := &http.Server{
@@ -48,6 +50,17 @@ func startFakeCUPS(t *testing.T) *fakeCUPS {
 		},
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			headers.Store(r.Header.Clone())
+			atomic.AddInt64(&reqs, 1)
+
+			// cupsd answers an unauthenticated administrative request with a
+			// challenge rather than a refusal.
+			if atomic.LoadInt64(&challenges) > 0 {
+				atomic.AddInt64(&challenges, -1)
+				w.Header().Set("WWW-Authenticate", `Basic realm="CUPS"`)
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
 			resp := &ipp.Response{
 				ProtocolVersionMajor: 2,
 				StatusCode:           ipp.StatusOk,
@@ -55,7 +68,7 @@ func startFakeCUPS(t *testing.T) *fakeCUPS {
 			}
 			body, err := resp.Encode()
 			if err != nil {
-				t.Errorf("no se pudo codificar la respuesta: %v", err)
+				t.Errorf("could not encode the response: %v", err)
 			}
 			w.Header().Set("Content-Type", ipp.ContentTypeIPP)
 			w.Write(body)
@@ -64,7 +77,13 @@ func startFakeCUPS(t *testing.T) *fakeCUPS {
 	go srv.Serve(ln)
 	t.Cleanup(func() { srv.Close() })
 
-	return &fakeCUPS{socket: sock, connections: &conns, headers: &headers}
+	return &fakeCUPS{
+		socket:      sock,
+		connections: &conns,
+		requests:    &reqs,
+		challenges:  &challenges,
+		headers:     &headers,
+	}
 }
 
 func TestSocketAdapterReusesOneConnection(t *testing.T) {
@@ -106,7 +125,7 @@ func TestSocketAdapterBuildsCUPSURIs(t *testing.T) {
 }
 
 func TestSocketAdapterReportsMissingSocket(t *testing.T) {
-	a := newSocketAdapter(filepath.Join(t.TempDir(), "no-existe.sock"))
+	a := newSocketAdapter(filepath.Join(t.TempDir(), "missing.sock"))
 	req := ipp.NewRequest(ipp.OperationCupsGetPrinters, 1)
 
 	_, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil)
@@ -184,7 +203,7 @@ func startFakeHTTPCUPS(t *testing.T, requireAuth bool) (*fakeCUPS, string) {
 	}
 	t.Cleanup(func() { ln.Close() })
 
-	var conns int64
+	var conns, reqs int64
 	var headers atomic.Value
 	headers.Store(http.Header{})
 
@@ -196,6 +215,7 @@ func startFakeHTTPCUPS(t *testing.T, requireAuth bool) (*fakeCUPS, string) {
 		},
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			headers.Store(r.Header.Clone())
+			atomic.AddInt64(&reqs, 1)
 			if requireAuth {
 				user, pass, ok := r.BasicAuth()
 				if !ok || user != "ana" || pass != "secret" {
@@ -215,7 +235,7 @@ func startFakeHTTPCUPS(t *testing.T, requireAuth bool) (*fakeCUPS, string) {
 	go srv.Serve(ln)
 	t.Cleanup(func() { srv.Close() })
 
-	return &fakeCUPS{connections: &conns, headers: &headers}, ln.Addr().String()
+	return &fakeCUPS{connections: &conns, requests: &reqs, headers: &headers}, ln.Addr().String()
 }
 
 func TestRemoteAdapterTalksOverTCP(t *testing.T) {
@@ -243,14 +263,20 @@ func TestRemoteAdapterBuildsURIsAgainstTheServer(t *testing.T) {
 	}
 }
 
-func TestRemoteAdapterReportsAnUnauthenticatedServerAsForbidden(t *testing.T) {
-	_, addr := startFakeHTTPCUPS(t, true)
+func TestRemoteAdapterReportsAnUnauthenticatedServerAsAChallenge(t *testing.T) {
+	fake, addr := startFakeHTTPCUPS(t, true)
 	a := newRemoteAdapter(addr, "", "", Server{Address: addr})
 
 	req := ipp.NewRequest(ipp.OperationCupsGetPrinters, 1)
 	_, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil)
-	if classify(err).Kind != KindForbidden {
-		t.Errorf("want KindForbidden, got %v", err)
+	if classify(err).Kind != KindUnauthorized {
+		t.Errorf("want KindUnauthorized, got %v", err)
+	}
+
+	// Retrying buys nothing without a password, and a remote server has no
+	// certificate to read again.
+	if got := atomic.LoadInt64(fake.requests); got != 1 {
+		t.Errorf("the adapter made %d requests against a remote server, want 1", got)
 	}
 }
 
@@ -279,5 +305,27 @@ func TestRemoteAdapterAcceptsCredentialsAfterTheFact(t *testing.T) {
 	req = ipp.NewRequest(ipp.OperationCupsGetPrinters, 2)
 	if _, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil); err != nil {
 		t.Errorf("after the password, SendRequest failed: %v", err)
+	}
+}
+
+func TestSocketAdapterAnswersAChallenge(t *testing.T) {
+	// The local certificate cupsd authenticates with is rotated underneath the
+	// process, so the copy read for a request can already be stale by the time
+	// it arrives. That comes back as a challenge, and giving up on it reports a
+	// permission problem the user does not have.
+	fake := startFakeCUPS(t)
+	atomic.StoreInt64(fake.challenges, 1)
+	a := newSocketAdapter(fake.socket)
+
+	req := ipp.NewRequest(ipp.OperationCupsGetDevices, 1)
+	if _, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil); err != nil {
+		t.Fatalf("the adapter gave up on the challenge: %v", err)
+	}
+
+	if got := atomic.LoadInt64(fake.requests); got != 2 {
+		t.Errorf("the adapter made %d requests, want 2 (the challenge and the retry)", got)
+	}
+	if got := atomic.LoadInt64(fake.connections); got != 1 {
+		t.Errorf("the retry opened %d connections, want 1", got)
 	}
 }

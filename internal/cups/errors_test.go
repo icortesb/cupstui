@@ -36,18 +36,24 @@ func TestClassifyRecognisesDaemonDown(t *testing.T) {
 }
 
 func TestClassifyRecognisesPermissionDenied(t *testing.T) {
-	for _, code := range []int{401, 403} {
-		t.Run(fmt.Sprint(code), func(t *testing.T) {
-			if got := classify(ipp.HTTPError{Code: code}).Kind; got != KindForbidden {
-				t.Errorf("Kind = %v, want KindForbidden", got)
-			}
-		})
+	if got := classify(ipp.HTTPError{Code: 403}).Kind; got != KindForbidden {
+		t.Errorf("403: Kind = %v, want KindForbidden", got)
 	}
-	// El equivalente a nivel IPP: not-authorized / forbidden.
+	// forbidden and not-authorized, the IPP equivalents.
 	for _, st := range []int16{0x0401, 0x0403} {
 		if got := classify(ipp.IPPError{Status: st, Message: "no"}).Kind; got != KindForbidden {
 			t.Errorf("status %#x: Kind = %v, want KindForbidden", st, got)
 		}
+	}
+}
+
+func TestClassifyRecognisesARequestForCredentials(t *testing.T) {
+	if got := classify(ipp.HTTPError{Code: 401}).Kind; got != KindUnauthorized {
+		t.Errorf("401: Kind = %v, want KindUnauthorized", got)
+	}
+	// not-authenticated, the IPP equivalent.
+	if got := classify(ipp.IPPError{Status: 0x0402, Message: "no"}).Kind; got != KindUnauthorized {
+		t.Errorf("status 0x0402: Kind = %v, want KindUnauthorized", got)
 	}
 }
 
@@ -118,5 +124,18 @@ func TestAStoppedLocalServiceStillSuggestsStartingIt(t *testing.T) {
 	}
 	if !strings.Contains(e.Hint, "systemctl") {
 		t.Errorf("Hint = %q, want the start instruction", e.Hint)
+	}
+}
+
+func TestAChallengeIsNotADenial(t *testing.T) {
+	// cupsd answers an unauthenticated administrative request with 401 to ask
+	// for credentials, and with 403 when the user has them and still may not.
+	// Reporting the first as a refusal tells a user with full rights that they
+	// have none.
+	challenge := classify(ipp.HTTPError{Code: 401})
+	refusal := classify(ipp.HTTPError{Code: 403})
+
+	if challenge.Kind == refusal.Kind {
+		t.Errorf("401 and 403 both classify as %v", challenge.Kind)
 	}
 }

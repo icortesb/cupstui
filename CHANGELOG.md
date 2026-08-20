@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.2 — 2026-08-20
+
+- The startup checks no longer report administrative access as denied when CUPS
+  merely asked for credentials. cupsd rotates the local certificate underneath a
+  running process, so the copy read for a request could already be stale by the
+  time it arrived; the request is now made again with a fresh one.
+- A request for credentials and a refusal of them are told apart everywhere, so
+  a remote server asking to sign in is no longer reported as a permission
+  problem.
+
 ## v0.1.1 — 2026-08-20
 
 - The row under the cursor in the queue and history tables no longer starts one

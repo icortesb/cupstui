@@ -1,6 +1,6 @@
 # Maintainer: icortesb <https://github.com/icortesb>
 pkgname=cupstui
-pkgver=0.1.1
+pkgver=0.1.2
 pkgrel=1
 pkgdesc="Terminal interface for CUPS: queue, printers, printing, quotas, history and logs"
 arch=('x86_64' 'aarch64')

@@ -158,12 +158,24 @@ func checkAdministrative(ctx context.Context, c *Client) CheckResult {
 	}
 
 	var cerr *Error
-	if errors.As(err, &cerr) && cerr.Kind == KindForbidden {
-		return CheckResult{
-			Name:   checkAdmin,
-			Status: CheckWarn,
-			Detail: "denied",
-			Hint:   "reading works; enabling printers, quotas and removal need membership in the CUPS SystemGroup (wheel on Arch and Fedora, lpadmin on Debian and Ubuntu)",
+	if errors.As(err, &cerr) {
+		switch cerr.Kind {
+		case KindForbidden:
+			return CheckResult{
+				Name:   checkAdmin,
+				Status: CheckWarn,
+				Detail: "denied",
+				Hint:   "reading works; enabling printers, quotas and removal need membership in the CUPS SystemGroup (wheel on Arch and Fedora, lpadmin on Debian and Ubuntu)",
+			}
+		case KindUnauthorized:
+			// Claiming the rights are missing would be a guess: cupsd asked for
+			// credentials and never got as far as deciding.
+			return CheckResult{
+				Name:   checkAdmin,
+				Status: CheckWarn,
+				Detail: "not established",
+				Hint:   "CUPS asked for credentials before answering; administrative actions will ask when they need them",
+			}
 		}
 	}
 	return unavailable(checkAdmin, err)

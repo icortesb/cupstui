@@ -22,6 +22,10 @@ const (
 	KindUntrusted
 	KindForbidden
 	KindNotFound
+	// KindUnauthorized is a request for credentials, not a refusal: cupsd
+	// answers an administrative request this way before it has authenticated
+	// anyone, and the caller is expected to try again.
+	KindUnauthorized
 )
 
 // Error is what this package returns: it keeps the original and adds a
@@ -79,14 +83,21 @@ func classify(err error) *Error {
 	}
 
 	var httpErr ipp.HTTPError
-	if errors.As(err, &httpErr) && (httpErr.Code == 401 || httpErr.Code == 403) {
-		return &Error{Kind: KindForbidden, Hint: permissionHint, Err: err}
+	if errors.As(err, &httpErr) {
+		switch httpErr.Code {
+		case 401:
+			return &Error{Kind: KindUnauthorized, Hint: credentialsHint, Err: err}
+		case 403:
+			return &Error{Kind: KindForbidden, Hint: permissionHint, Err: err}
+		}
 	}
 
 	var ippErr ipp.IPPError
 	if errors.As(err, &ippErr) {
 		switch ippErr.Status {
-		case ippForbidden, ippNotAuthenticated, ippNotAuthorized:
+		case ippNotAuthenticated:
+			return &Error{Kind: KindUnauthorized, Hint: credentialsHint, Err: err}
+		case ippForbidden, ippNotAuthorized:
 			return &Error{Kind: KindForbidden, Hint: permissionHint, Err: err}
 		case ippNotFound:
 			return &Error{Kind: KindNotFound, Hint: "the printer or job no longer exists", Err: err}
@@ -101,6 +112,8 @@ func classify(err error) *Error {
 }
 
 const permissionHint = "permission denied — this operation requires membership in the CUPS SystemGroup (usually wheel)"
+
+const credentialsHint = "CUPS asked for credentials — press S to sign in to a remote server"
 
 // isUntrusted is a certificate this machine cannot vouch for.
 func isUntrusted(err error) bool {

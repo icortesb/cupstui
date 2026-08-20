@@ -24,7 +24,7 @@ func testModel() Model {
 			{Name: "HP_LaserJet", State: cups.StateStopped, Reasons: []string{"media-empty"}},
 		},
 		Jobs: []cups.Job{
-			{ID: 42, Name: "informe.pdf", User: "icortes", Printer: "Epson_L3150", State: cups.JobProcessing, Created: time.Now()},
+			{ID: 42, Name: "report.pdf", User: "icortes", Printer: "Epson_L3150", State: cups.JobProcessing, Created: time.Now()},
 		},
 	}
 	m.queue.setSize(m.width, 10)
@@ -65,7 +65,7 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 		}},
 		{"logs without permission", func(m *Model) {
 			m.tab = tabLogs
-			m.logs.setLines(nil, &cups.Error{Kind: cups.KindForbidden, Hint: "sin permisos"})
+			m.logs.setLines(nil, &cups.Error{Kind: cups.KindForbidden, Hint: "permission denied"})
 		}},
 		{"add: scanning", func(m *Model) {
 			m.add.active = true
@@ -398,5 +398,24 @@ func TestRemovingAnEmptyPrinterAsksPlainly(t *testing.T) {
 	}
 	if strings.Contains(m.confirm.prompt, "queued") {
 		t.Errorf("prompt = %q, should not mention jobs when there are none", m.confirm.prompt)
+	}
+}
+
+func TestSignInIsOfferedWhenTheServerAsksForCredentials(t *testing.T) {
+	t.Setenv("CUPS_SERVER", "print.example.org")
+
+	c, err := cups.New()
+	if err != nil {
+		t.Fatalf("cups.New: %v", err)
+	}
+	m := testModel()
+	m.client = c
+
+	// A challenge and a refusal both leave the user needing to sign in; only the
+	// challenge says a password is what is missing, but neither may be swallowed.
+	for _, kind := range []cups.Kind{cups.KindUnauthorized, cups.KindForbidden} {
+		if cmd := m.offerSignIn(&cups.Error{Kind: kind}); cmd == nil {
+			t.Errorf("kind %v: no sign-in was offered", kind)
+		}
 	}
 }

@@ -55,9 +55,10 @@ var socketSearchPaths = []string{
 	"/private/var/run/cupsd",
 }
 
-// certSearchPaths holds the CUPS local authentication certificate. It is
-// usually readable by root alone; without it, the socket peer credentials are
-// enough for the local user.
+// certSearchPaths holds the CUPS local authentication certificate. Whether it
+// can be read depends on the permissions of the directory holding it, which
+// vary by distribution; cupsd rotates the file while the process runs, and it
+// authenticates whoever presents it as root.
 var certSearchPaths = []string{"/run/cups/certs/0", "/etc/cups/certs/0"}
 
 func newSocketAdapter(socket string) *socketAdapter {
@@ -279,32 +280,42 @@ func (a *socketAdapter) SendRequestContext(ctx context.Context, url string, r *i
 		return nil, fmt.Errorf("could not encode the IPP request: %w", err)
 	}
 
-	size := len(payload)
-	var body io.Reader = bytes.NewReader(payload)
-	if r.File != nil && r.FileSize != -1 {
-		size += r.FileSize
-		body = io.MultiReader(bytes.NewReader(payload), r.File)
+	attempt := func() (*http.Response, error) {
+		size := len(payload)
+		var body io.Reader = bytes.NewReader(payload)
+		if r.File != nil && r.FileSize != -1 {
+			size += r.FileSize
+			body = io.MultiReader(bytes.NewReader(payload), r.File)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+		if err != nil {
+			return nil, fmt.Errorf("could not build the HTTP request: %w", err)
+		}
+		req.Header.Set("Content-Length", strconv.Itoa(size))
+		req.Header.Set("Content-Type", ipp.ContentTypeIPP)
+		a.authorize(req)
+
+		return a.client.Do(req)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
-	if err != nil {
-		return nil, fmt.Errorf("could not build the HTTP request: %w", err)
-	}
-	req.Header.Set("Content-Length", strconv.Itoa(size))
-	req.Header.Set("Content-Type", ipp.ContentTypeIPP)
-
-	if user, password, ok := a.credentials(); ok {
-		req.SetBasicAuth(user, password)
-	} else if cert := a.cert(); cert != "" {
-		// Only root can read the local certificate. Sending the header empty
-		// makes cupsd log an error for every request; without the header it
-		// authenticates by unix socket credentials and leaves error_log alone.
-		req.Header.Set("Authorization", "Local "+cert)
-	}
-
-	resp, err := a.client.Do(req)
+	resp, err := attempt()
 	if err != nil {
 		return nil, err
+	}
+
+	// cupsd asks for credentials before it refuses, and the local certificate it
+	// accepts is rotated underneath a running process: the copy read for this
+	// request can already be stale by the time it arrives. Reading it again is
+	// the whole point of the second attempt, so there is nothing to gain from
+	// one against a remote server, and a body read from a file cannot be sent
+	// twice.
+	if resp.StatusCode == http.StatusUnauthorized && a.socket != "" && r.File == nil {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		if resp, err = attempt(); err != nil {
+			return nil, err
+		}
 	}
 	defer resp.Body.Close()
 
@@ -333,8 +344,23 @@ func (a *socketAdapter) SendRequestContext(ctx context.Context, url string, r *i
 	return ippResp, nil
 }
 
+// authorize presents whatever credentials this adapter has. Sending an empty
+// Authorization header makes cupsd log an error for every request, so a header
+// goes on only when there is something to put in it.
+func (a *socketAdapter) authorize(req *http.Request) {
+	if user, password, ok := a.credentials(); ok {
+		req.SetBasicAuth(user, password)
+		return
+	}
+	if cert := a.cert(); cert != "" {
+		req.Header.Set("Authorization", "Local "+cert)
+	}
+}
+
 // cert reads the local certificate when it is readable; otherwise it returns
-// empty and CUPS authenticates by unix socket credentials.
+// empty and CUPS authenticates by unix socket credentials, which are enough for
+// everything except device discovery. It is read on every request because
+// cupsd replaces the file periodically.
 func (a *socketAdapter) cert() string {
 	if a.socket == "" {
 		return ""

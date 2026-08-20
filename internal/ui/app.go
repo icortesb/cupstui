@@ -786,10 +786,15 @@ func (m *Model) resize() {
 }
 
 // offerSignIn asks for a password when a remote server refuses and none has
-// been given yet.
+// been given yet. A server that asks for credentials and one that refuses them
+// both land here: only the first says a password is what is missing, but a
+// server configured to refuse outright would otherwise leave no way to sign in.
 func (m *Model) offerSignIn(err error) tea.Cmd {
 	var cerr *cups.Error
-	if !errors.As(err, &cerr) || cerr.Kind != cups.KindForbidden {
+	if !errors.As(err, &cerr) {
+		return nil
+	}
+	if cerr.Kind != cups.KindUnauthorized && cerr.Kind != cups.KindForbidden {
 		return nil
 	}
 	if m.client == nil || !m.client.NeedsPassword() {
