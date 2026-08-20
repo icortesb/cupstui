@@ -34,11 +34,12 @@ const (
 	checkPrint  = "Printing tools"
 	checkAdmin  = "Administrative access"
 	checkDriver = "Printer drivers"
+	checkLink   = "Connection"
 )
 
 // PreflightNames lists the checks in the order they are shown.
 func PreflightNames() []string {
-	return []string{checkDaemon, checkPrint, checkAdmin, checkDriver}
+	return []string{checkDaemon, checkLink, checkPrint, checkAdmin, checkDriver}
 }
 
 // PreflightStatus folds the results into one status: anything still running
@@ -66,7 +67,7 @@ func PreflightStatus(results []CheckResult) CheckStatus {
 // results arrive as they finish.
 func Preflight(ctx context.Context, c *Client, out chan<- CheckResult) {
 	checks := []func(context.Context, *Client) CheckResult{
-		checkService, checkTools, checkAdministrative, checkDrivers,
+		checkService, checkLinkSecurity, checkTools, checkAdministrative, checkDrivers,
 	}
 
 	for _, check := range checks {
@@ -93,6 +94,35 @@ func checkService(ctx context.Context, c *Client) CheckResult {
 		Name:   checkDaemon,
 		Status: CheckOK,
 		Detail: fmt.Sprintf("%s, %d %s configured", c.Server(), len(snap.Printers), plural(len(snap.Printers), "printer")),
+	}
+}
+
+// checkLinkSecurity reports whether what crosses the network is protected. A
+// local socket never leaves the machine, so there is nothing to protect.
+func checkLinkSecurity(_ context.Context, c *Client) CheckResult {
+	server := c.Server()
+
+	switch {
+	case server.Local:
+		return CheckResult{Name: checkLink, Status: CheckOK, Detail: "local socket"}
+	case !server.Encrypted():
+		return CheckResult{
+			Name:   checkLink,
+			Status: CheckWarn,
+			Detail: "not encrypted",
+			Hint:   "everything, passwords included, crosses the network in the clear — set Encryption Required in ~/.cups/client.conf, or CUPS_ENCRYPTION=Required",
+		}
+	case server.AllowAnyRoot:
+		return CheckResult{
+			Name:   checkLink,
+			Status: CheckWarn,
+			Detail: "encrypted, certificate not checked",
+			Hint:   "the server is taken at its word — anything able to answer in its place would be believed",
+		}
+	default:
+		// This reports the configuration, not the outcome: whether the
+		// certificate actually checks out shows up on the service check.
+		return CheckResult{Name: checkLink, Status: CheckOK, Detail: "encrypted, certificate checked"}
 	}
 }
 

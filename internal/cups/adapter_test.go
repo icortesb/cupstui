@@ -220,7 +220,7 @@ func startFakeHTTPCUPS(t *testing.T, requireAuth bool) (*fakeCUPS, string) {
 
 func TestRemoteAdapterTalksOverTCP(t *testing.T) {
 	fake, addr := startFakeHTTPCUPS(t, false)
-	a := newRemoteAdapter(addr, "", "")
+	a := newRemoteAdapter(addr, "", "", Server{Address: addr})
 
 	for i := 0; i < 10; i++ {
 		req := ipp.NewRequest(ipp.OperationCupsGetPrinters, int32(i))
@@ -237,7 +237,7 @@ func TestRemoteAdapterTalksOverTCP(t *testing.T) {
 }
 
 func TestRemoteAdapterBuildsURIsAgainstTheServer(t *testing.T) {
-	a := newRemoteAdapter("print.example.org:631", "", "")
+	a := newRemoteAdapter("print.example.org:631", "", "", Server{Address: "print.example.org:631"})
 	if got := a.GetHttpUri("admin", nil); got != "http://print.example.org:631/admin" {
 		t.Errorf("GetHttpUri = %q", got)
 	}
@@ -245,7 +245,7 @@ func TestRemoteAdapterBuildsURIsAgainstTheServer(t *testing.T) {
 
 func TestRemoteAdapterReportsAnUnauthenticatedServerAsForbidden(t *testing.T) {
 	_, addr := startFakeHTTPCUPS(t, true)
-	a := newRemoteAdapter(addr, "", "")
+	a := newRemoteAdapter(addr, "", "", Server{Address: addr})
 
 	req := ipp.NewRequest(ipp.OperationCupsGetPrinters, 1)
 	_, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil)
@@ -256,7 +256,7 @@ func TestRemoteAdapterReportsAnUnauthenticatedServerAsForbidden(t *testing.T) {
 
 func TestRemoteAdapterSendsCredentialsWhenItHasThem(t *testing.T) {
 	_, addr := startFakeHTTPCUPS(t, true)
-	a := newRemoteAdapter(addr, "ana", "secret")
+	a := newRemoteAdapter(addr, "ana", "secret", Server{Address: addr})
 
 	req := ipp.NewRequest(ipp.OperationCupsGetPrinters, 1)
 	if _, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil); err != nil {
@@ -268,7 +268,7 @@ func TestRemoteAdapterAcceptsCredentialsAfterTheFact(t *testing.T) {
 	// The password is asked for once the server refuses, so the adapter has to
 	// take it without being rebuilt and losing its connection pool.
 	_, addr := startFakeHTTPCUPS(t, true)
-	a := newRemoteAdapter(addr, "ana", "")
+	a := newRemoteAdapter(addr, "ana", "", Server{Address: addr})
 
 	req := ipp.NewRequest(ipp.OperationCupsGetPrinters, 1)
 	if _, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil); err == nil {

@@ -12,10 +12,11 @@ import (
 // passwordModel asks for the password of a remote CUPS. It appears when the
 // server refuses a request, not before: many servers answer reads without one.
 type passwordModel struct {
-	active bool
-	server string
-	input  textinput.Model
-	width  int
+	active    bool
+	server    string
+	encrypted bool
+	input     textinput.Model
+	width     int
 }
 
 func newPassword() passwordModel {
@@ -33,9 +34,10 @@ func newPassword() passwordModel {
 func (p *passwordModel) restyle()          { styleInput(&p.input) }
 func (p *passwordModel) setSize(width int) { p.width = width; p.input.Width = width - 20 }
 
-func (p *passwordModel) start(server string) tea.Cmd {
+func (p *passwordModel) start(server string, encrypted bool) tea.Cmd {
 	p.active = true
 	p.server = server
+	p.encrypted = encrypted
 	p.input.SetValue("")
 	p.input.Focus()
 	return textinput.Blink
@@ -68,12 +70,24 @@ func (p *passwordModel) handleKey(msg tea.KeyMsg, c *cups.Client) tea.Cmd {
 }
 
 func (p passwordModel) view() string {
-	return strings.Join([]string{
+	lines := []string{
 		"  " + styleBold.Render("Sign in to "+p.server),
 		"",
 		"  " + styleLabel.Render("Password  ") + p.input.View(),
 		"",
-		"  " + styleDim.Render("enter to send · esc to cancel"),
-		"  " + styleDim.Render("The password is kept for this session only, never written to disk."),
-	}, "\n")
+	}
+
+	if !p.encrypted {
+		// Sending a password over a connection nobody is protecting is worth
+		// saying out loud, once, at the moment it would happen.
+		lines = append(lines,
+			"  "+styleWarnText.Render("This connection is not encrypted; the password would cross the network in the clear."),
+			"  "+styleDim.Render("Set Encryption Required in ~/.cups/client.conf, or CUPS_ENCRYPTION=Required."),
+			"")
+	}
+
+	return strings.Join(append(lines,
+		"  "+styleDim.Render("enter to send · esc to cancel"),
+		"  "+styleDim.Render("The password is kept for this session only, never written to disk."),
+	), "\n")
 }

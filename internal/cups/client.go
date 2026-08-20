@@ -39,7 +39,7 @@ func New() (*Client, error) {
 	if server.Local {
 		adapter = newSocketAdapter(server.Address)
 	} else {
-		adapter = newRemoteAdapter(server.Address, server.User, "")
+		adapter = newRemoteAdapter(server.Address, server.User, "", server)
 	}
 
 	c := newWithAdapter(server.User, adapter)

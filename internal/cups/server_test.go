@@ -135,3 +135,123 @@ func TestServerDescribesItselfForTheInterface(t *testing.T) {
 		t.Errorf("String = %q", got)
 	}
 }
+
+func TestEncryptionDefaultsToNone(t *testing.T) {
+	withClientConf(t, "ServerName print.example.org\n")
+	t.Setenv("CUPS_SERVER", "")
+	t.Setenv("CUPS_ENCRYPTION", "")
+
+	s := ResolveServer()
+	if s.Encryption != EncryptNever {
+		t.Errorf("Encryption = %v, want EncryptNever", s.Encryption)
+	}
+	if s.TLS() {
+		t.Error("no encryption means no TLS")
+	}
+}
+
+func TestEncryptionFromClientConf(t *testing.T) {
+	cases := map[string]Encryption{
+		"Never":       EncryptNever,
+		"IfRequested": EncryptIfRequested,
+		"Required":    EncryptRequired,
+		"Always":      EncryptAlways,
+		"always":      EncryptAlways,
+		"nonsense":    EncryptNever,
+	}
+	for value, want := range cases {
+		t.Run(value, func(t *testing.T) {
+			withClientConf(t, "ServerName host\nEncryption "+value+"\n")
+			t.Setenv("CUPS_SERVER", "")
+			t.Setenv("CUPS_ENCRYPTION", "")
+
+			if got := ResolveServer().Encryption; got != want {
+				t.Errorf("Encryption = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestCUPSEncryptionOverridesClientConf(t *testing.T) {
+	withClientConf(t, "ServerName host\nEncryption Never\n")
+	t.Setenv("CUPS_SERVER", "")
+	t.Setenv("CUPS_ENCRYPTION", "Always")
+
+	if got := ResolveServer().Encryption; got != EncryptAlways {
+		t.Errorf("Encryption = %v, want the environment to win", got)
+	}
+}
+
+func TestOnlyAlwaysConnectsWithTLSFromTheStart(t *testing.T) {
+	// Required and IfRequested negotiate over a plain connection first, the way
+	// CUPS does: they are not https.
+	cases := map[Encryption]bool{
+		EncryptNever:       false,
+		EncryptIfRequested: false,
+		EncryptRequired:    false,
+		EncryptAlways:      true,
+	}
+	for enc, want := range cases {
+		if got := (Server{Encryption: enc}).TLS(); got != want {
+			t.Errorf("%v: TLS = %v, want %v", enc, got, want)
+		}
+	}
+}
+
+func TestCertificatesAreVerifiedUnlessTheUserOptsOut(t *testing.T) {
+	// CUPS itself defaults to accepting any root, which quietly makes a
+	// man in the middle indistinguishable from the real server. Verifying is
+	// the default here, and turning it off has to be deliberate.
+	withClientConf(t, "ServerName host\nEncryption Always\n")
+	t.Setenv("CUPS_SERVER", "")
+	t.Setenv("CUPS_ENCRYPTION", "")
+	t.Setenv("CUPS_ANYROOT", "")
+
+	if ResolveServer().AllowAnyRoot {
+		t.Error("certificates must be verified by default")
+	}
+
+	withClientConf(t, "ServerName host\nAllowAnyRoot Yes\n")
+	if !ResolveServer().AllowAnyRoot {
+		t.Error("AllowAnyRoot Yes in client.conf must be honoured")
+	}
+
+	withClientConf(t, "ServerName host\n")
+	t.Setenv("CUPS_ANYROOT", "1")
+	if !ResolveServer().AllowAnyRoot {
+		t.Error("CUPS_ANYROOT must be honoured")
+	}
+}
+
+func TestLocalConnectionsAreNeverEncrypted(t *testing.T) {
+	// A unix socket does not cross a network; wrapping it in TLS would only
+	// fail, since the certificate names a host.
+	withClientConf(t, "")
+	t.Setenv("CUPS_SERVER", "")
+	t.Setenv("CUPS_ENCRYPTION", "Always")
+
+	s := ResolveServer()
+	if !s.Local {
+		t.Fatal("want the local socket")
+	}
+	if s.TLS() {
+		t.Error("a unix socket must not be wrapped in TLS")
+	}
+}
+
+func TestServerDescribesItsEncryption(t *testing.T) {
+	plain := Server{Host: "h", Address: "h:631"}
+	if got := plain.String(); got != "h:631" {
+		t.Errorf("String = %q", got)
+	}
+
+	secure := Server{Host: "h", Address: "h:631", Encryption: EncryptAlways}
+	if got := secure.String(); got != "h:631 (TLS)" {
+		t.Errorf("String = %q, want the encryption named", got)
+	}
+
+	unverified := Server{Host: "h", Address: "h:631", Encryption: EncryptAlways, AllowAnyRoot: true}
+	if got := unverified.String(); got != "h:631 (TLS, unverified)" {
+		t.Errorf("String = %q, want the missing verification named", got)
+	}
+}

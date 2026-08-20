@@ -1,6 +1,8 @@
 package cups
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net"
 	"os"
@@ -17,6 +19,7 @@ const (
 	KindUnknown Kind = iota
 	KindDaemonDown
 	KindUnreachable
+	KindUntrusted
 	KindForbidden
 	KindNotFound
 )
@@ -49,6 +52,14 @@ const (
 func classify(err error) *Error {
 	if err == nil {
 		return nil
+	}
+
+	if isUntrusted(err) {
+		return &Error{
+			Kind: KindUntrusted,
+			Hint: "the server certificate cannot be verified — add its issuer to this machine, or set AllowAnyRoot Yes in ~/.cups/client.conf to accept it unverified",
+			Err:  err,
+		}
 	}
 
 	if isUnreachable(err) {
@@ -90,6 +101,17 @@ func classify(err error) *Error {
 }
 
 const permissionHint = "permission denied — this operation requires membership in the CUPS SystemGroup (usually wheel)"
+
+// isUntrusted is a certificate this machine cannot vouch for.
+func isUntrusted(err error) bool {
+	var unknown x509.UnknownAuthorityError
+	var hostname x509.HostnameError
+	var invalid x509.CertificateInvalidError
+	var record *tls.CertificateVerificationError
+
+	return errors.As(err, &unknown) || errors.As(err, &hostname) ||
+		errors.As(err, &invalid) || errors.As(err, &record)
+}
 
 // isUnreachable is a network failure reaching a named server, as opposed to a
 // local service that is not running: the remedy is on the other machine.

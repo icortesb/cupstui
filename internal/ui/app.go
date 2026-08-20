@@ -414,7 +414,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setStatus("The local CUPS authenticates by connection, no password needed.", true)
 			return m, nil
 		}
-		return m, m.password.start(m.client.Server().String())
+		return m, m.password.start(m.client.Server().String(), m.client.Server().Encrypted())
 
 	case key.Matches(msg, keys.Transparent):
 		SetTransparent(!transparent)
@@ -793,7 +793,7 @@ func (m *Model) offerSignIn(err error) tea.Cmd {
 	if m.client == nil || !m.client.NeedsPassword() {
 		return nil
 	}
-	return m.password.start(m.client.Server().String())
+	return m.password.start(m.client.Server().String(), m.client.Server().Encrypted())
 }
 
 // rememberSeen records that the startup checks have been shown, so they do not
@@ -908,7 +908,7 @@ func (m Model) headerView() string {
 
 	right := styleDim.Render(m.syncLabel())
 	if server := m.serverLabel(); server != "" {
-		right = styleAccentText.Render(server) + styleDim.Render("  ") + right
+		right = m.serverStyle().Render(server) + styleDim.Render("  ") + right
 	}
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right)
 	if gap < 1 {
@@ -928,6 +928,21 @@ func (m Model) serverLabel() string {
 		return server.String()
 	}
 	return ""
+}
+
+// serverStyle warns when a remote connection is unprotected. Reading a queue
+// in the clear is one thing; the password for an administrative operation
+// crosses the same wire.
+func (m Model) serverStyle() lipgloss.Style {
+	server := m.client.Server()
+	switch {
+	case !server.Encrypted():
+		return styleWarnText
+	case server.AllowAnyRoot:
+		return styleWarnText
+	default:
+		return styleOKText
+	}
 }
 
 func (m Model) syncLabel() string {

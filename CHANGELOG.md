@@ -15,5 +15,5 @@ First public version.
   export.
 - CUPS logs with live tail, tinted by severity.
 - Remote servers through `CUPS_SERVER` and `~/.cups/client.conf`, signing in
-  when the server asks.
+  when the server asks, with TLS through the `Encryption` directive.
 - Startup checks reporting what the machine can and cannot do.
