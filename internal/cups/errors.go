@@ -2,6 +2,7 @@ package cups
 
 import (
 	"errors"
+	"net"
 	"os"
 	"syscall"
 
@@ -15,6 +16,7 @@ type Kind int
 const (
 	KindUnknown Kind = iota
 	KindDaemonDown
+	KindUnreachable
 	KindForbidden
 	KindNotFound
 )
@@ -49,6 +51,14 @@ func classify(err error) *Error {
 		return nil
 	}
 
+	if isUnreachable(err) {
+		return &Error{
+			Kind: KindUnreachable,
+			Hint: "cannot reach the CUPS server — check CUPS_SERVER and that the host is up",
+			Err:  err,
+		}
+	}
+
 	if isDaemonDown(err) {
 		return &Error{
 			Kind: KindDaemonDown,
@@ -80,6 +90,26 @@ func classify(err error) *Error {
 }
 
 const permissionHint = "permission denied — this operation requires membership in the CUPS SystemGroup (usually wheel)"
+
+// isUnreachable is a network failure reaching a named server, as opposed to a
+// local service that is not running: the remedy is on the other machine.
+func isUnreachable(err error) bool {
+	var dns *net.DNSError
+	if errors.As(err, &dns) {
+		return true
+	}
+	if errors.Is(err, syscall.EHOSTUNREACH) || errors.Is(err, syscall.ENETUNREACH) {
+		return true
+	}
+
+	// A refused or timed-out dial over TCP is a remote server; over a unix
+	// socket it is the local service.
+	var op *net.OpError
+	if errors.As(err, &op) && op.Net != "" && op.Net != "unix" {
+		return true
+	}
+	return false
+}
 
 func isDaemonDown(err error) bool {
 	if errors.Is(err, ipp.SocketNotFoundError) {

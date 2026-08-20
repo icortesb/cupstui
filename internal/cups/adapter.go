@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	ipp "github.com/phin1x/go-ipp"
@@ -29,6 +30,17 @@ type socketAdapter struct {
 	socket    string
 	certPaths []string
 	client    *http.Client
+
+	// base is the URL prefix every request is built on. Over a unix socket the
+	// host is irrelevant but net/http still needs a valid one.
+	base string
+
+	// user and password authenticate against a remote server. They are guarded
+	// because the password is asked for after a request has been refused, while
+	// the adapter is already in use.
+	mu       sync.RWMutex
+	user     string
+	password string
 }
 
 // socketSearchPaths covers the usual locations of the cupsd socket.
@@ -49,17 +61,52 @@ func newSocketAdapter(socket string) *socketAdapter {
 	return &socketAdapter{
 		socket:    socket,
 		certPaths: certSearchPaths,
-		client: &http.Client{
-			Transport: &http.Transport{
-				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-					return dialer.DialContext(ctx, "unix", socket)
-				},
-				MaxIdleConns:        2,
-				MaxIdleConnsPerHost: 2,
-				IdleConnTimeout:     90 * time.Second,
-			},
+		base:      "http://localhost",
+		client: newHTTPClient(func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return dialer.DialContext(ctx, "unix", socket)
+		}),
+	}
+}
+
+// newRemoteAdapter talks to a CUPS reachable over the network. The connection
+// is reused the same way as the local one: a remote server has the same
+// MaxClients to exhaust.
+func newRemoteAdapter(address, user, password string) *socketAdapter {
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	return &socketAdapter{
+		base:     "http://" + address,
+		user:     user,
+		password: password,
+		client: newHTTPClient(func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, address)
+		}),
+	}
+}
+
+func newHTTPClient(dial func(context.Context, string, string) (net.Conn, error)) *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext:         dial,
+			MaxIdleConns:        2,
+			MaxIdleConnsPerHost: 2,
+			IdleConnTimeout:     90 * time.Second,
 		},
 	}
+}
+
+// setPassword supplies the password once the server has asked for it, without
+// rebuilding the adapter and losing its connection.
+func (a *socketAdapter) setPassword(password string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.password = password
+}
+
+// credentials reports what to authenticate with, if anything.
+func (a *socketAdapter) credentials() (user, password string, ok bool) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.user, a.password, a.user != "" && a.password != ""
 }
 
 // close releases the persistent connection.
@@ -106,10 +153,13 @@ func (a *socketAdapter) SendRequestContext(ctx context.Context, url string, r *i
 	}
 	req.Header.Set("Content-Length", strconv.Itoa(size))
 	req.Header.Set("Content-Type", ipp.ContentTypeIPP)
-	// Only root can read the local certificate. Sending the header empty makes
-	// cupsd log an error for every request; without the header it authenticates
-	// by unix socket credentials and leaves error_log alone.
-	if cert := a.cert(); cert != "" {
+
+	if user, password, ok := a.credentials(); ok {
+		req.SetBasicAuth(user, password)
+	} else if cert := a.cert(); cert != "" {
+		// Only root can read the local certificate. Sending the header empty
+		// makes cupsd log an error for every request; without the header it
+		// authenticates by unix socket credentials and leaves error_log alone.
 		req.Header.Set("Authorization", "Local "+cert)
 	}
 
@@ -147,6 +197,9 @@ func (a *socketAdapter) SendRequestContext(ctx context.Context, url string, r *i
 // cert reads the local certificate when it is readable; otherwise it returns
 // empty and CUPS authenticates by unix socket credentials.
 func (a *socketAdapter) cert() string {
+	if a.socket == "" {
+		return ""
+	}
 	for _, path := range a.certPaths {
 		if b, err := os.ReadFile(path); err == nil {
 			return string(bytes.TrimSpace(b))
@@ -155,10 +208,9 @@ func (a *socketAdapter) cert() string {
 	return ""
 }
 
-// GetHttpUri builds the URLs cupsd expects. The host is irrelevant because the
-// transport goes over the socket, but net/http requires a valid one.
+// GetHttpUri builds the URLs cupsd expects.
 func (a *socketAdapter) GetHttpUri(namespace string, object interface{}) string {
-	uri := "http://localhost"
+	uri := a.base
 	if namespace != "" {
 		uri += "/" + namespace
 	}
@@ -169,6 +221,9 @@ func (a *socketAdapter) GetHttpUri(namespace string, object interface{}) string 
 }
 
 func (a *socketAdapter) TestConnection() error {
+	if a.socket == "" {
+		return nil // a remote server answers, or does not, on the first request
+	}
 	conn, err := net.DialTimeout("unix", a.socket, 5*time.Second)
 	if err != nil {
 		return err

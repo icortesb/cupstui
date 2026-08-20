@@ -60,8 +60,21 @@ administrative group: `wheel` on Arch and Fedora, `lpadmin` on Debian and
 Ubuntu. The first run reports which of these apply on your machine, and
 `cupstui -check` repeats it later.
 
-Only the local CUPS is supported. `CUPS_SERVER` and `~/.cups/client.conf` are
-not read yet.
+## Remote servers
+
+A CUPS on another machine is reached the same way the command line tools reach
+it: the `CUPS_SERVER` environment variable, or `ServerName` in
+`~/.cups/client.conf`. `CUPS_USER` and the `User` directive set the account.
+
+```sh
+CUPS_SERVER=print.example.org cupstui
+```
+
+The server is named in the header so it is never a surprise which machine is
+being administered. Many servers answer reads without credentials and ask for
+them only on an administrative operation; when that happens the password is
+asked for then, kept for the session and never written to disk. `S` brings the
+prompt up on demand.
 
 ## Keys
 
@@ -73,6 +86,7 @@ not read yet.
 | `r` | refresh now |
 | `?` | help |
 | `T` | toggle transparent background |
+| `S` | sign in to a remote server |
 | `q` | quit |
 
 **Queue** — `p` hold or release, `x` cancel, `X` cancel every job.

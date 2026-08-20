@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -81,4 +82,41 @@ func TestClassifyReturnsNilForNilError(t *testing.T) {
 // asError es errors.As, con nombre propio para que los tests lean mejor.
 func asError(err error, target **Error) bool {
 	return errors.As(err, target)
+}
+
+func TestClassifyDistinguishesAnUnreachableServerFromAStoppedService(t *testing.T) {
+	// Telling someone to run systemctl when the name simply does not resolve
+	// sends them to the wrong machine.
+	cases := []struct {
+		name string
+		err  error
+	}{
+		{"name does not resolve", &net.DNSError{Err: "no such host", Name: "print.example.invalid"}},
+		{"no route to the host", &net.OpError{Op: "dial", Net: "tcp", Err: syscall.EHOSTUNREACH}},
+		{"the network is down", &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ENETUNREACH}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e := classify(c.err)
+			if e.Kind != KindUnreachable {
+				t.Fatalf("Kind = %v, want KindUnreachable", e.Kind)
+			}
+			if strings.Contains(e.Hint, "systemctl") {
+				t.Errorf("Hint = %q, should not suggest starting a local service", e.Hint)
+			}
+			if e.Hint == "" {
+				t.Error("want an actionable hint")
+			}
+		})
+	}
+}
+
+func TestAStoppedLocalServiceStillSuggestsStartingIt(t *testing.T) {
+	e := classify(ipp.SocketNotFoundError)
+	if e.Kind != KindDaemonDown {
+		t.Fatalf("Kind = %v, want KindDaemonDown", e.Kind)
+	}
+	if !strings.Contains(e.Hint, "systemctl") {
+		t.Errorf("Hint = %q, want the start instruction", e.Hint)
+	}
 }

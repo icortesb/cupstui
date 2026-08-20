@@ -106,6 +106,7 @@ type Model struct {
 	add       addModel
 	policy    policyModel
 	preflight preflightModel
+	password  passwordModel
 
 	confirm     *confirmation
 	helpVP      viewport.Model
@@ -127,6 +128,7 @@ func New(c *cups.Client) Model {
 		add:       newAdd(),
 		policy:    newPolicy(),
 		preflight: newPreflight(),
+		password:  newPassword(),
 		helpVP:    viewport.New(80, 10),
 		width:     80,
 		height:    24,
@@ -215,6 +217,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshing = true
 		if msg.err != nil {
 			m.setStatus(describeError(msg.err), true)
+			// A remote server refusing means credentials, not group
+			// membership: offer the prompt instead of a dead end.
+			if cmd := m.offerSignIn(msg.err); cmd != nil {
+				return m, cmd
+			}
 		} else {
 			m.setStatus(msg.text, false)
 		}
@@ -297,6 +304,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// With a text field focused, or the file browser open, the keys belong to
 	// the form: otherwise the global shortcuts (1..6, r, q, /) would eat the
 	// letters being typed.
+	// The password prompt takes every key: it is a text field.
+	if m.password.active {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, m.password.handleKey(msg, m.client)
+	}
+
 	// The startup screen takes every key until it is dismissed.
 	if m.preflight.active {
 		switch msg.String() {
@@ -393,6 +408,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
+
+	case key.Matches(msg, keys.SignIn):
+		if m.client == nil || m.client.Server().Local {
+			m.setStatus("The local CUPS authenticates by connection, no password needed.", true)
+			return m, nil
+		}
+		return m, m.password.start(m.client.Server().String())
 
 	case key.Matches(msg, keys.Transparent):
 		SetTransparent(!transparent)
@@ -755,9 +777,23 @@ func (m *Model) resize() {
 	m.add.setSize(m.width, body)
 	m.policy.setSize(m.width)
 	m.preflight.setSize(m.width)
+	m.password.setSize(m.width)
 	m.helpVP.Width = m.width
 	m.helpVP.Height = body
 	m.helpVP.SetContent(helpView(m.width))
+}
+
+// offerSignIn asks for a password when a remote server refuses and none has
+// been given yet.
+func (m *Model) offerSignIn(err error) tea.Cmd {
+	var cerr *cups.Error
+	if !errors.As(err, &cerr) || cerr.Kind != cups.KindForbidden {
+		return nil
+	}
+	if m.client == nil || !m.client.NeedsPassword() {
+		return nil
+	}
+	return m.password.start(m.client.Server().String())
 }
 
 // rememberSeen records that the startup checks have been shown, so they do not
@@ -800,6 +836,7 @@ func (m *Model) restyle() {
 	m.print.restyle()
 	m.add.restyle()
 	m.policy.restyle()
+	m.password.restyle()
 	m.helpVP.SetContent(helpView(m.width))
 }
 
@@ -870,12 +907,27 @@ func (m Model) headerView() string {
 		append([]string{styleTitle.Render("cupstui"), " "}, tabs...)...)
 
 	right := styleDim.Render(m.syncLabel())
+	if server := m.serverLabel(); server != "" {
+		right = styleAccentText.Render(server) + styleDim.Render("  ") + right
+	}
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right)
 	if gap < 1 {
 		gap = 1
 	}
 	line := left + strings.Repeat(" ", gap) + right
 	return styleHeaderBar.Width(m.width).Render(line)
+}
+
+// serverLabel names the server when it is a remote one, so it is never a
+// surprise which machine is being administered.
+func (m Model) serverLabel() string {
+	if m.client == nil {
+		return ""
+	}
+	if server := m.client.Server(); !server.Local {
+		return server.String()
+	}
+	return ""
 }
 
 func (m Model) syncLabel() string {
@@ -902,6 +954,9 @@ func (m Model) bodyView() string {
 	}
 	if m.policy.active {
 		return m.policy.view()
+	}
+	if m.password.active {
+		return m.password.view()
 	}
 	if m.showHelp {
 		return m.helpVP.View()

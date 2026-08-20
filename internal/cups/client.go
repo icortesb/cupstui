@@ -10,7 +10,6 @@ package cups
 import (
 	"context"
 	"fmt"
-	"os/user"
 	"sort"
 	"strconv"
 
@@ -20,30 +19,57 @@ import (
 // Client is a CUPS client safe for the interface: it never panics and always
 // returns classified errors.
 type Client struct {
+	server  Server
 	user    string
 	adapter ipp.Adapter
 	cups    *ipp.CUPSClient
 	ipp     *ipp.IPPClient
 }
 
-// New connects to the local CUPS over its unix socket.
+// New connects to whichever CUPS the environment points at: CUPS_SERVER, then
+// ServerName in the user's client.conf, and the local socket otherwise.
 //
-// A missing socket is not an error: the interface starts anyway, shows the
-// notice and recovers on its own once the service returns, so this points at
-// the canonical path and lets each request fail.
+// A missing socket or an unreachable server is not an error here: the interface
+// starts anyway, shows the notice and recovers on its own once the service
+// returns.
 func New() (*Client, error) {
-	name := "root"
-	if u, err := user.Current(); err == nil {
-		name = u.Username
+	server := ResolveServer()
+
+	var adapter *socketAdapter
+	if server.Local {
+		adapter = newSocketAdapter(server.Address)
+	} else {
+		adapter = newRemoteAdapter(server.Address, server.User, "")
 	}
 
-	socket, err := findSocket(socketSearchPaths)
-	if err != nil {
-		socket = socketSearchPaths[0]
-	}
-
-	c := newWithAdapter(name, newSocketAdapter(socket))
+	c := newWithAdapter(server.User, adapter)
+	c.server = server
 	return c, nil
+}
+
+// Server is the CUPS this client talks to.
+func (c *Client) Server() Server { return c.server }
+
+// NeedsPassword reports whether the client is talking to a remote server that
+// has not been given a password yet. A local socket never needs one: CUPS
+// authenticates by the credentials of the connection.
+func (c *Client) NeedsPassword() bool {
+	if c.server.Local {
+		return false
+	}
+	a, ok := c.adapter.(*socketAdapter)
+	if !ok {
+		return false
+	}
+	_, _, has := a.credentials()
+	return !has
+}
+
+// SetPassword supplies the password for a remote server.
+func (c *Client) SetPassword(password string) {
+	if a, ok := c.adapter.(*socketAdapter); ok {
+		a.setPassword(password)
+	}
 }
 
 // Close releases the persistent connection to cupsd.

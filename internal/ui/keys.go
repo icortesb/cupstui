@@ -29,6 +29,7 @@ type keyMap struct {
 	Policy        key.Binding
 	Help          key.Binding
 	Transparent   key.Binding
+	SignIn        key.Binding
 	Escape        key.Binding
 	Quit          key.Binding
 }
@@ -60,6 +61,7 @@ var keys = keyMap{
 	Policy:        key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "quotas and access")),
 	Help:          key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 	Transparent:   key.NewBinding(key.WithKeys("T"), key.WithHelp("T", "toggle transparent background")),
+	SignIn:        key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "sign in to a remote server")),
 	Escape:        key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 	Quit:          key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 }

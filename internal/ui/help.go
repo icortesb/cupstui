@@ -26,7 +26,7 @@ func helpView(width int) string {
 		}},
 		{"History", []key.Binding{keys.Summary, keys.Filter, keys.Export}},
 		{"Logs", []key.Binding{keys.NextLog}},
-		{"General", []key.Binding{keys.Refresh, keys.Transparent, keys.Escape, keys.Help, keys.Quit}},
+		{"General", []key.Binding{keys.Refresh, keys.Transparent, keys.SignIn, keys.Escape, keys.Help, keys.Quit}},
 	}
 
 	rendered := make([]string, 0, len(sections))

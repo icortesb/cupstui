@@ -85,14 +85,14 @@ func checkService(ctx context.Context, c *Client) CheckResult {
 		return CheckResult{
 			Name:   checkDaemon,
 			Status: CheckFail,
-			Detail: "not responding",
-			Hint:   "start it with: systemctl start cups",
+			Detail: "not responding at " + c.Server().String(),
+			Hint:   describe(err),
 		}
 	}
 	return CheckResult{
 		Name:   checkDaemon,
 		Status: CheckOK,
-		Detail: fmt.Sprintf("running, %d %s configured", len(snap.Printers), plural(len(snap.Printers), "printer")),
+		Detail: fmt.Sprintf("%s, %d %s configured", c.Server(), len(snap.Printers), plural(len(snap.Printers), "printer")),
 	}
 }
 
@@ -144,7 +144,7 @@ func checkAdministrative(ctx context.Context, c *Client) CheckResult {
 // off here: repeating it on every dependent line buries the one that matters.
 func unavailable(name string, err error) CheckResult {
 	var cerr *Error
-	if errors.As(err, &cerr) && cerr.Kind == KindDaemonDown {
+	if errors.As(err, &cerr) && (cerr.Kind == KindDaemonDown || cerr.Kind == KindUnreachable) {
 		return CheckResult{
 			Name:   name,
 			Status: CheckWarn,
