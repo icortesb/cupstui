@@ -9,7 +9,7 @@ import (
 	ipp "github.com/phin1x/go-ipp"
 )
 
-// fakeAdapter implementa ipp.Adapter para probar el cliente sin un CUPS vivo.
+// fakeAdapter implements ipp.Adapter so the client can be tested with no live CUPS.
 type fakeAdapter struct {
 	responses map[int16]*ipp.Response
 	err       error

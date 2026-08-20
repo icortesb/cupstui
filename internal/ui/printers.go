@@ -7,7 +7,6 @@ import (
 	"github.com/icortesb/cupstui/internal/cups"
 )
 
-// printersModel es la vista de impresoras: una lista navegable con acciones.
 type printersModel struct {
 	cursor int
 }
@@ -92,7 +91,6 @@ func stateBadge(p cups.Printer) string {
 	return style.Render(symbol + " " + p.State.String())
 }
 
-// problemLine junta el mensaje de estado con los motivos que reporta CUPS.
 func problemLine(p cups.Printer) string {
 	var parts []string
 	if p.StateMessage != "" {

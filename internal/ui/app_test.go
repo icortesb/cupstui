@@ -160,7 +160,6 @@ func first(s string, n int) string {
 	return string(r[:n])
 }
 
-// press arma un tea.KeyMsg a partir de lo que se tipea.
 func press(s string) tea.KeyMsg {
 	switch s {
 	case "esc":

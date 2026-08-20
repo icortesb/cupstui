@@ -34,8 +34,8 @@ func helpView(width int) string {
 		rendered = append(rendered, renderSection(sec))
 	}
 
-	// En dos columnas la ayuda entra completa en una terminal corta; en una
-	// terminal angosta se apilan.
+	// Two columns fit the whole help on a short terminal; a narrow one has to
+	// stack them instead.
 	body := strings.Join(rendered, "\n")
 	if width >= 74 {
 		half := (len(rendered) + 1) / 2

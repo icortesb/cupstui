@@ -438,7 +438,7 @@ func cursorLine(selected bool, label string) string {
 	return "    " + label + "\n"
 }
 
-// scrollStart mantiene el cursor visible dentro de una ventana de rows filas.
+// scrollStart keeps the cursor inside a window of rows lines.
 func scrollStart(cursor, total, rows int) int {
 	if total <= rows || cursor < rows/2 {
 		return 0

@@ -134,7 +134,7 @@ func TestAddPrinterSendsAddModifyWithDeviceAndDriver(t *testing.T) {
 func TestAddPrinterRejectsABadName(t *testing.T) {
 	f := &fakeAdapter{}
 	err := newTestClient(f).AddPrinter(t.Context(), NewPrinterSpec{
-		Name: "nombre con espacios", DeviceURI: "socket://x:9100",
+		Name: "name with spaces", DeviceURI: "socket://x:9100",
 	})
 	if err == nil {
 		t.Fatal("want a validation error")

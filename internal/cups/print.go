@@ -26,7 +26,7 @@ import (
 type Duplex int
 
 const (
-	DuplexDefault Duplex = iota // lo que tenga configurado la impresora
+	DuplexDefault Duplex = iota // whatever the printer is configured for
 	DuplexNone
 	DuplexLongEdge
 	DuplexShortEdge

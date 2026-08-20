@@ -6,8 +6,8 @@ import (
 	ipp "github.com/phin1x/go-ipp"
 )
 
-// attrs arma un ipp.Attributes como el que devuelve CUPS: cada clave mapea a
-// una lista de atributos con Tag/Name/Value.
+// attrs builds an ipp.Attributes the way CUPS returns one: every key maps to
+// a list of attributes carrying Tag/Name/Value.
 func attrs(kv map[string]interface{}) ipp.Attributes {
 	a := ipp.Attributes{}
 	for k, v := range kv {

@@ -79,7 +79,7 @@ func TestClassifyReturnsNilForNilError(t *testing.T) {
 	}
 }
 
-// asError es errors.As, con nombre propio para que los tests lean mejor.
+// asError is errors.As under a name that keeps the assertions readable.
 func asError(err error, target **Error) bool {
 	return errors.As(err, target)
 }
