@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -21,24 +22,92 @@ func dashboardView(snap cups.Snapshot, width int) string {
 	}
 
 	var b strings.Builder
-	b.WriteString(joinCards(cards, width))
+	b.WriteString(overview(snap, width))
 	b.WriteString("\n\n")
-	b.WriteString(queueSummary(snap))
+	b.WriteString(joinCards(cards, width))
 	return b.String()
 }
 
-func printerCard(p cups.Printer, jobs int) string {
-	lines := []string{
-		styleBold.Render(p.Name),
-		stateBadge(p),
+// overview is the line an operator reads first: whether anything needs
+// attention, and how much work is waiting.
+func overview(snap cups.Snapshot, width int) string {
+	var stopped, rejecting, printing int
+	for _, p := range snap.Printers {
+		if p.State == cups.StateStopped {
+			stopped++
+		}
+		if !p.Accepting {
+			rejecting++
+		}
+		if p.State == cups.StatePrinting {
+			printing++
+		}
 	}
+
+	items := []string{
+		stat(len(snap.Printers), "printer", styleValue),
+		stat(len(snap.Jobs), "job queued", styleValue),
+	}
+	if printing > 0 {
+		items = append(items, stat(printing, "printing", styleOKText))
+	}
+	if stopped > 0 {
+		items = append(items, stat(stopped, "stopped", styleErrText))
+	}
+	if rejecting > 0 {
+		items = append(items, stat(rejecting, "rejecting jobs", styleWarnText))
+	}
+
+	return "  " + strings.Join(items, styleDim.Render("   "))
+}
+
+func stat(value int, label string, style lipgloss.Style) string {
+	return style.Bold(true).Render(strconv.Itoa(value)) + " " + styleDim.Render(plural(value, label))
+}
+
+// plural adds the s to a counted noun, on the last word so that "job queued"
+// becomes "jobs queued" rather than "job queueds".
+func plural(n int, label string) string {
+	if n == 1 {
+		return label
+	}
+	words := strings.SplitN(label, " ", 2)
+	words[0] += "s"
+	return strings.Join(words, " ")
+}
+
+func printerCard(p cups.Printer, jobs int) string {
+	// Name and state share the top line so the card reads as one unit rather
+	// than a stack of unrelated facts.
+	head := styleBold.Render(truncate(p.Name, 18)) + "  " + stateBadge(p)
+
+	var tags []string
 	if p.IsDefault {
-		lines = append(lines, styleKey.Render("default"))
+		tags = append(tags, styleKey.Render("default"))
 	}
 	if !p.Accepting {
-		lines = append(lines, styleWarnText.Render("rejecting jobs"))
+		tags = append(tags, styleWarnText.Render("rejecting"))
 	}
-	lines = append(lines, styleLabel.Render("queued: ")+styleValue.Render(fmt.Sprint(jobs)))
+
+	lines := []string{head}
+	if len(tags) > 0 {
+		lines = append(lines, strings.Join(tags, styleDim.Render(" · ")))
+	}
+
+	detail := p.Info
+	if detail == "" {
+		detail = p.MakeModel
+	}
+	if detail != "" {
+		lines = append(lines, styleDim.Render(truncate(detail, 28)))
+	}
+
+	queued := styleDim.Render("idle queue")
+	if jobs > 0 {
+		queued = styleValue.Bold(true).Render(fmt.Sprint(jobs)) +
+			styleDim.Render(" "+plural(jobs, "job")+" waiting")
+	}
+	lines = append(lines, queued)
 
 	if msg := problemLine(p); msg != "" {
 		lines = append(lines, styleWarnText.Render(truncate(msg, 28)))
@@ -68,23 +137,6 @@ func joinCards(cards []string, width int) string {
 		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, cards[i:end]...))
 	}
 	return strings.Join(rows, "\n")
-}
-
-func queueSummary(snap cups.Snapshot) string {
-	var activos int
-	for _, j := range snap.Jobs {
-		if j.State == cups.JobProcessing {
-			activos++
-		}
-	}
-
-	total := styleBold.Render(fmt.Sprint(len(snap.Jobs)))
-	act := styleBold.Render(fmt.Sprint(activos))
-	line := fmt.Sprintf("  %s queued · %s printing now", total, act)
-	if len(snap.Jobs) == 0 {
-		line = "  " + styleDim.Render("No jobs queued.")
-	}
-	return line
 }
 
 func jobsFor(jobs []cups.Job, printer string) int {

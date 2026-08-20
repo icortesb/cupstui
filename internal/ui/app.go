@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -216,6 +218,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case logsMsg:
 		m.logs.setLines(msg.lines, msg.err)
+		return m, nil
+
+	case spinner.TickMsg:
+		if m.add.active && m.add.loading {
+			var cmd tea.Cmd
+			m.add.spin, cmd = m.add.spin.Update(msg)
+			return m, cmd
+		}
 		return m, nil
 
 	case devicesMsg:
@@ -430,6 +440,10 @@ func (m Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Filter):
 		return m, m.history.startFiltering()
+
+	case key.Matches(msg, keys.Summary):
+		m.history.summary = !m.history.summary
+		return m, nil
 
 	case key.Matches(msg, keys.Export):
 		if len(m.history.visible) == 0 {
@@ -773,11 +787,22 @@ func (m Model) View() string {
 func (m Model) headerView() string {
 	tabs := make([]string, 0, len(tabNames))
 	for i, name := range tabNames {
-		if tab(i) == m.tab {
-			tabs = append(tabs, styleTabActive.Render(name))
-		} else {
-			tabs = append(tabs, styleTabInactive.Render(name))
+		label := name
+		// The queue is the one tab whose contents change on their own, so it
+		// carries its count and can be watched from any other screen.
+		if tab(i) == tabQueue && len(m.snap.Jobs) > 0 {
+			label = fmt.Sprintf("%s %d", name, len(m.snap.Jobs))
 		}
+
+		if tab(i) == m.tab {
+			tabs = append(tabs, styleTabActive.Render(label))
+			continue
+		}
+		if tab(i) == tabQueue && len(m.snap.Jobs) > 0 {
+			tabs = append(tabs, styleTabInactive.Render(name)+styleBadge.Render(strconv.Itoa(len(m.snap.Jobs))))
+			continue
+		}
+		tabs = append(tabs, styleTabInactive.Render(label))
 	}
 
 	left := lipgloss.JoinHorizontal(lipgloss.Bottom,

@@ -14,6 +14,7 @@ type keyMap struct {
 	Tab5          key.Binding
 	Tab6          key.Binding
 	Export        key.Binding
+	Summary       key.Binding
 	NextLog       key.Binding
 	Filter        key.Binding
 	Refresh       key.Binding
@@ -44,6 +45,7 @@ var keys = keyMap{
 	Tab5:          key.NewBinding(key.WithKeys("5"), key.WithHelp("5", "history")),
 	Tab6:          key.NewBinding(key.WithKeys("6"), key.WithHelp("6", "logs")),
 	Export:        key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "export CSV")),
+	Summary:       key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "totals / rows")),
 	NextLog:       key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next log")),
 	Filter:        key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 	Refresh:       key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh now")),

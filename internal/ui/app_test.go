@@ -86,6 +86,18 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 					Document: "report.pdf", When: time.Now()},
 			}, nil)
 		}},
+		{"history totals", func(m *Model) {
+			m.tab = tabHistory
+			m.history.summary = true
+			m.history.setEntries([]cups.HistoryEntry{
+				{Printer: "Epson_L3150", User: "icortes", Pages: 3, Document: "a.pdf", When: time.Now()},
+				{Printer: "HP_LaserJet", User: "ana", Pages: 9, Document: "b.pdf", When: time.Now()},
+			}, nil)
+		}},
+		{"añadiendo: explorando con spinner", func(m *Model) {
+			m.add.active = true
+			m.add.loading = true
+		}},
 		{"history sin permisos", func(m *Model) {
 			m.tab = tabHistory
 			m.history.setEntries(nil, &cups.Error{Kind: cups.KindForbidden, Hint: "denied"})

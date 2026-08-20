@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -24,6 +25,7 @@ type historyModel struct {
 	all       []cups.HistoryEntry
 	visible   []cups.HistoryEntry
 	err       error
+	summary   bool // show the per-user and per-printer totals instead of the rows
 	width     int
 }
 
@@ -150,8 +152,13 @@ func (h historyModel) view() string {
 		)
 	}
 
+	if h.summary {
+		return h.summaryView()
+	}
+
 	jobs, pages := cups.HistoryTotals(h.visible)
-	summary := styleDim.Render(fmt.Sprintf("%d jobs · %d pages", jobs, pages))
+	summary := styleDim.Render(fmt.Sprintf("%d %s · %d %s",
+		jobs, plural(jobs, "job"), pages, plural(pages, "page")))
 	if h.filter.Value() != "" {
 		summary = styleDim.Render(fmt.Sprintf("%d of %d jobs · %d pages",
 			len(h.visible), len(h.all), pages))
@@ -170,6 +177,54 @@ func (h historyModel) view() string {
 		return lipgloss.JoinVertical(lipgloss.Left, header, "", styleDim.Render("  "+empty))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, header, h.table.View())
+}
+
+// summaryView answers the question an audit starts from: who and what printed
+// the most. The rows behind it stay one key away.
+func (h historyModel) summaryView() string {
+	jobs, pages := cups.HistoryTotals(h.visible)
+
+	head := styleDim.Render(fmt.Sprintf("%d %s · %d %s",
+		jobs, plural(jobs, "job"), pages, plural(pages, "page")))
+	if h.filter.Value() != "" {
+		head = styleDim.Render(fmt.Sprintf("%d of %d jobs · %d pages",
+			len(h.visible), len(h.all), pages))
+	}
+
+	left := usageTable("BY USER", cups.UsageByUser(h.visible), pages)
+	right := usageTable("BY PRINTER", cups.UsageByPrinter(h.visible), pages)
+
+	body := lipgloss.JoinHorizontal(lipgloss.Top,
+		styleApp.Width(h.width/2).Render(left), right)
+	return lipgloss.JoinVertical(lipgloss.Left, head, "", body)
+}
+
+// usageTable lists totals with a share bar, so the distribution reads at a
+// glance rather than from comparing numbers.
+func usageTable(title string, rows []cups.Usage, totalPages int) string {
+	var b strings.Builder
+	b.WriteString("  " + styleBold.Render(title) + "\n")
+
+	if len(rows) == 0 {
+		b.WriteString("  " + styleDim.Render("nothing recorded") + "\n")
+		return b.String()
+	}
+
+	for i, r := range rows {
+		if i >= 8 {
+			b.WriteString("  " + styleDim.Render(fmt.Sprintf("+%d more", len(rows)-i)) + "\n")
+			break
+		}
+		share := 0.0
+		if totalPages > 0 {
+			share = float64(r.Pages) / float64(totalPages)
+		}
+		fmt.Fprintf(&b, "  %s %s %s\n",
+			styleValue.Render(pad(truncate(r.Name, 16), 16)),
+			styleAccentText.Render(miniBar(share, 10)),
+			styleDim.Render(fmt.Sprintf("%d pages · %d jobs", r.Pages, r.Jobs)))
+	}
+	return b.String()
 }
 
 // readHistory loads the page log off the UI goroutine.

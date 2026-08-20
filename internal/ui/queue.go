@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -107,7 +108,7 @@ func (q *queueModel) setJobs(jobs []cups.Job) {
 			name = "(untitled)"
 		}
 		rows = append(rows, table.Row{
-			strconv.Itoa(j.ID), j.User, name, j.Printer, j.State.String(), hora,
+			strconv.Itoa(j.ID), j.User, name, j.Printer, jobState(j), hora,
 		})
 	}
 
@@ -120,6 +121,26 @@ func (q *queueModel) setJobs(jobs []cups.Job) {
 		cursor = 0
 	}
 	q.table.SetCursor(cursor)
+}
+
+// jobState is the state cell: a printing job shows how far along it is, which
+// is the one thing worth watching in a queue.
+func jobState(j cups.Job) string {
+	fraction, known := j.Progress()
+	if !known {
+		return j.State.String()
+	}
+	return fmt.Sprintf("%s %d%%", miniBar(fraction, 5), int(fraction*100+0.5))
+}
+
+// miniBar draws a bar in the width of a table cell, where a full progress
+// component would not fit.
+func miniBar(fraction float64, width int) string {
+	filled := int(fraction*float64(width) + 0.5)
+	if filled > width {
+		filled = width
+	}
+	return strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
 }
 
 func (q queueModel) selected() (cups.Job, bool) {
@@ -145,7 +166,10 @@ func (q *queueModel) stopFiltering(clear bool) {
 }
 
 func (q queueModel) view(total int) string {
-	header := styleDim.Render(fmt.Sprintf("%d of %d jobs", len(q.visible), total))
+	header := styleDim.Render(fmt.Sprintf("%d %s", total, plural(total, "job")))
+	if q.filter.Value() != "" {
+		header = styleDim.Render(fmt.Sprintf("%d of %d jobs", len(q.visible), total))
+	}
 	if q.filtering || q.filter.Value() != "" {
 		header = lipgloss.JoinHorizontal(lipgloss.Left, q.filter.View(), "  ", header)
 	}

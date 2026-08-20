@@ -52,14 +52,34 @@ type Job struct {
 	State   JobState
 	Created time.Time
 	KOctets int
+	// Sheets is what the job is expected to print, SheetsDone what it has
+	// printed so far. CUPS reports both only once the job reaches the printer.
+	Sheets     int
+	SheetsDone int
+}
+
+// Progress is how far along a printing job is, and whether that is known at
+// all: CUPS reports no sheet total until the job has been through the filters,
+// and a bar drawn from a missing total would be a lie.
+func (j Job) Progress() (float64, bool) {
+	if j.State != JobProcessing || j.Sheets <= 0 {
+		return 0, false
+	}
+	done := j.SheetsDone
+	if done > j.Sheets {
+		done = j.Sheets
+	}
+	return float64(done) / float64(j.Sheets), true
 }
 
 func jobFromAttributes(id int, a ipp.Attributes) Job {
 	j := Job{
-		ID:      id,
-		Name:    attrString(a, "job-name"),
-		User:    attrString(a, "job-originating-user-name"),
-		KOctets: attrInt(a, "job-k-octets"),
+		ID:         id,
+		Name:       attrString(a, "job-name"),
+		User:       attrString(a, "job-originating-user-name"),
+		KOctets:    attrInt(a, "job-k-octets"),
+		Sheets:     attrInt(a, "job-media-sheets"),
+		SheetsDone: attrInt(a, "job-media-sheets-completed"),
 	}
 
 	uri := attrString(a, "job-printer-uri")

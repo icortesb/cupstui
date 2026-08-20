@@ -95,6 +95,8 @@ var jobAttributes = []string{
 	"job-state",
 	"time-at-creation",
 	"job-k-octets",
+	"job-media-sheets",
+	"job-media-sheets-completed",
 }
 
 // Snapshot queries printers, queue and default in one pass.

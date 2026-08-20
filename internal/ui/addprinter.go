@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -31,6 +32,7 @@ type addModel struct {
 	loading bool
 	err     error
 
+	spin      spinner.Model
 	devices   []cups.Device
 	devCursor int
 	uri       textinput.Model
@@ -59,7 +61,11 @@ func newAdd() addModel {
 		t.CharLimit = limit
 		return t
 	}
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+
 	a := addModel{
+		spin:      sp,
 		uri:       mk("socket://192.168.0.50:9100", 200),
 		ppdFilter: mk("filter drivers by model", 60),
 		name:      mk("no spaces, / or #", 127),
@@ -93,7 +99,10 @@ func (a *addModel) start(c *cups.Client) tea.Cmd {
 	a.setSize(width, height)
 	a.active = true
 	a.loading = true
-	return tea.Batch(discoverDevices(c), fetchPPDs(c))
+	a.spin.Style = styleAccentText
+	// The scan takes seconds while CUPS probes the network; without something
+	// moving it reads as a hang.
+	return tea.Batch(a.spin.Tick, discoverDevices(c), fetchPPDs(c))
 }
 
 func (a *addModel) cancel() {
@@ -349,7 +358,7 @@ func (a addModel) view() string {
 
 func (a addModel) deviceView() string {
 	if a.loading {
-		return styleDim.Render("  Scanning USB and network… this can take a few seconds")
+		return "  " + a.spin.View() + styleDim.Render(" Scanning USB and network… this can take a few seconds")
 	}
 
 	var b strings.Builder

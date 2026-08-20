@@ -42,6 +42,7 @@ var (
 	styleDim         lipgloss.Style
 	styleKey         lipgloss.Style
 	styleApp         lipgloss.Style
+	styleBadge       lipgloss.Style
 	styleAccentText  lipgloss.Style
 	styleWarnText    lipgloss.Style
 	styleOKText      lipgloss.Style
@@ -76,15 +77,23 @@ func buildStyles() {
 		Background(colorAccent).
 		Padding(0, 1)
 
-	styleTabActive = base().
+	// The active tab is filled rather than underlined: on a wide bar of six
+	// names, an underline is easy to miss.
+	styleTabActive = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(colorAccent).
-		Underline(true).
+		Foreground(lipgloss.Color("232")).
+		Background(colorAccent).
 		Padding(0, 2)
 
 	styleTabInactive = base().
 		Foreground(colorMuted).
 		Padding(0, 2)
+
+	styleBadge = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("232")).
+		Background(colorWarn).
+		Padding(0, 1)
 
 	styleHeaderBar = base().
 		BorderStyle(lipgloss.NormalBorder()).

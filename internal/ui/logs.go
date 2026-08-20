@@ -54,7 +54,7 @@ func (l *logsModel) setLines(lines []string, err error) {
 }
 
 func (l *logsModel) render() {
-	body := strings.Join(l.lines, "\n")
+	body := strings.Join(colourise(l.lines), "\n")
 	if l.err != nil {
 		body = ""
 	}
@@ -97,6 +97,27 @@ func (l logsModel) view(width int) string {
 		return header + "\n\n" + styleDim.Render("  The log is empty.")
 	}
 	return header + "\n" + l.vp.View()
+}
+
+// colourise tints each line by the level cupsd stamped on it, so that an error
+// stands out in a wall of routine chatter.
+func colourise(lines []string) []string {
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		switch cups.LineSeverity(line) {
+		case cups.SeverityError:
+			out[i] = styleErrText.Render(line)
+		case cups.SeverityWarning:
+			out[i] = styleWarnText.Render(line)
+		case cups.SeverityInfo:
+			out[i] = styleValue.Render(line)
+		case cups.SeverityDebug:
+			out[i] = styleDim.Render(line)
+		default:
+			out[i] = styleValue.Render(line)
+		}
+	}
+	return out
 }
 
 // readLog lee el registro fuera del hilo de la UI.
