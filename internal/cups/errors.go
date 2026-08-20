@@ -53,6 +53,19 @@ const (
 	ippNotFound         int16 = 0x0406
 )
 
+// isNotFound is cupsd answering that nothing matched the request, which it
+// does both by IPP status and, for some operations, by message alone.
+func isNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	var ippErr ipp.IPPError
+	if errors.As(err, &ippErr) && ippErr.Status == ippNotFound {
+		return true
+	}
+	return ipp.IsNotExistsError(err)
+}
+
 func classify(err error) *Error {
 	if err == nil {
 		return nil

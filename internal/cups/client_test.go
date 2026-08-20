@@ -13,7 +13,9 @@ import (
 type fakeAdapter struct {
 	responses map[int16]*ipp.Response
 	err       error
-	seen      []*ipp.Request
+	// errs answers one operation with an error while the rest still work.
+	errs map[int16]error
+	seen []*ipp.Request
 }
 
 func (f *fakeAdapter) SendRequest(url string, req *ipp.Request, w io.Writer) (*ipp.Response, error) {
@@ -24,6 +26,9 @@ func (f *fakeAdapter) SendRequestContext(_ context.Context, _ string, req *ipp.R
 	f.seen = append(f.seen, req)
 	if f.err != nil {
 		return nil, f.err
+	}
+	if err, ok := f.errs[req.Operation]; ok {
+		return nil, err
 	}
 	if resp, ok := f.responses[req.Operation]; ok {
 		return resp, nil
@@ -214,5 +219,27 @@ func TestJobActionErrorsAreClassified(t *testing.T) {
 	f = &fakeAdapter{err: ipp.HTTPError{Code: 401}}
 	if err := newTestClient(f).HoldJob(1); !errors.As(err, &cerr) || cerr.Kind != KindUnauthorized {
 		t.Errorf("want KindUnauthorized, got %v", err)
+	}
+}
+
+// TestSnapshotEmptyCUPS covers a machine with no printers yet. cupsd answers
+// CUPS-Get-Printers with client-error-not-found rather than an empty list, and
+// taking that at face value made the whole interface refuse to start on a
+// fresh install — the one case where the user most needs it to.
+func TestSnapshotEmptyCUPS(t *testing.T) {
+	f := &fakeAdapter{errs: map[int16]error{
+		ipp.OperationCupsGetPrinters: ipp.IPPError{Status: ipp.StatusErrorNotFound, Message: "No destinations added."},
+		ipp.OperationCupsGetDefault:  ipp.IPPError{Status: ipp.StatusErrorNotFound, Message: "No default printer."},
+	}}
+
+	snap, err := newTestClient(f).Snapshot(context.Background())
+	if err != nil {
+		t.Fatalf("Snapshot on a CUPS with no printers: %v", err)
+	}
+	if len(snap.Printers) != 0 {
+		t.Errorf("got %d printers, want none", len(snap.Printers))
+	}
+	if snap.Default != "" {
+		t.Errorf("Default = %q, want empty", snap.Default)
 	}
 }

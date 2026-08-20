@@ -160,9 +160,19 @@ func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
 	return snap, nil
 }
 
+// getPrinters treats "nothing found" as an empty list. A CUPS with no queues
+// configured answers CUPS-Get-Printers with client-error-not-found instead of
+// an empty response, and reporting that as a failure would keep the interface
+// from starting on the one machine that most needs it: a fresh install with no
+// printer added yet.
 func (c *Client) getPrinters(ctx context.Context) (printers map[string]ipp.Attributes, err error) {
 	defer func() { err = recovered(recover(), err) }()
-	return c.cups.GetPrintersContext(ctx, printerAttributes)
+
+	printers, err = c.cups.GetPrintersContext(ctx, printerAttributes)
+	if isNotFound(err) {
+		return nil, nil
+	}
+	return printers, err
 }
 
 func (c *Client) getJobs(ctx context.Context) (jobs map[int]ipp.Attributes, err error) {
