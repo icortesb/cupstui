@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.8 — 2026-08-20
+
+- The interface starts on a machine that has no printers yet. Asked for the
+  printer list, a CUPS with nothing configured answers "not found" rather than
+  with an empty list, and taking that at its word made the startup checks report
+  the service as not responding and the interface refuse to go further — "CUPS
+  is not available", on the very machine that most needs it, a fresh install
+  where the first thing to do is add a printer. An empty answer is now read as
+  what it is, and the check says "0 printers configured".
+
 ## v0.1.7 — 2026-08-20
 
 - A first install no longer ends in `cupstui: command not found`. There is an
