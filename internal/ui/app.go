@@ -288,7 +288,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case devicesMsg:
 		m.add.loading = false
-		m.add.devices, m.add.err = msg.devices, msg.err
+		m.add.setDevices(msg.devices)
+		m.add.err = msg.err
 		return m, nil
 
 	case ppdsMsg:

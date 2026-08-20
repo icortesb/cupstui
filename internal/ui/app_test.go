@@ -76,7 +76,7 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 		}},
 		{"add: devices", func(m *Model) {
 			m.add.active = true
-			m.add.devices = []cups.Device{{URI: "lpd://1.2.3.4:515/x", MakeModel: "EPSON L3150"}}
+			m.add.setDevices([]cups.Device{{URI: "lpd://1.2.3.4:515/x", MakeModel: "EPSON L3150"}})
 		}},
 		{"add: drivers", func(m *Model) {
 			m.add.active = true

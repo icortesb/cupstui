@@ -33,7 +33,7 @@ type addModel struct {
 	err     error
 
 	spin      spinner.Model
-	devices   []cups.Device
+	choices   []cups.DeviceChoice
 	devCursor int
 	uri       textinput.Model
 
@@ -139,8 +139,14 @@ func fetchPPDs(c *cups.Client) tea.Cmd {
 	}
 }
 
+// setDevices takes the scan result and orders it for the list.
+func (a *addModel) setDevices(devices []cups.Device) {
+	a.choices = cups.DeviceChoices(devices)
+	a.devCursor = 0
+}
+
 // deviceCount includes the manual URI entry, always last.
-func (a addModel) deviceCount() int { return len(a.devices) + 1 }
+func (a addModel) deviceCount() int { return len(a.choices) + 1 }
 
 func (a *addModel) refreshMatches() {
 	query := a.ppdFilter.Value()
@@ -249,15 +255,15 @@ func (a *addModel) back() {
 func (a *addModel) advance(c *cups.Client) tea.Cmd {
 	switch a.step {
 	case stepDevice:
-		if a.devCursor == len(a.devices) { // the manual entry
+		if a.devCursor == len(a.choices) { // the manual entry
 			a.step = stepURI
 			a.uri.Focus()
 			return textinput.Blink
 		}
-		if a.devCursor >= len(a.devices) {
+		if a.devCursor >= len(a.choices) {
 			return nil
 		}
-		d := a.devices[a.devCursor]
+		d := a.choices[a.devCursor].Device
 		a.chosenURI = d.URI
 		a.ppdFilter.SetValue(d.MakeModel)
 		a.refreshMatches()
@@ -303,7 +309,7 @@ func (a *addModel) advance(c *cups.Client) tea.Cmd {
 			if err := c.AddPrinter(ctx, spec); err != nil {
 				return actionMsg{err: err}
 			}
-			return actionMsg{text: "Impresora " + spec.Name + " agregada."}
+			return actionMsg{text: "Printer " + spec.Name + " added."}
 		}
 	}
 	return nil
@@ -312,16 +318,12 @@ func (a *addModel) advance(c *cups.Client) tea.Cmd {
 // suggestName proposes a valid name from what the device reported, which is
 // almost always the one wanted.
 func (a *addModel) suggestName(d cups.Device) {
-	base := d.MakeModel
-	if base == "" || strings.EqualFold(base, "unknown") {
-		base = d.Info
-	}
 	name := strings.Map(func(r rune) rune {
 		if r == ' ' || r == '/' || r == '#' {
 			return '_'
 		}
 		return r
-	}, strings.TrimSpace(base))
+	}, strings.TrimSpace(cups.DeviceName(d)))
 	a.name.SetValue(name)
 }
 
@@ -332,10 +334,24 @@ func clampIndex(i, n int) int {
 	return ((i % n) + n) % n
 }
 
+// stepLabel numbers the step the user is on. stepURI is not a step of its own
+// but the other way of finishing the first one, so numbering by the enum would
+// skip a step whenever the printer did turn up in the scan.
+func (a addModel) stepLabel() string {
+	n := 1
+	switch a.step {
+	case stepDriver:
+		n = 2
+	case stepDetails:
+		n = 3
+	}
+	return fmt.Sprintf("step %d of 3", n)
+}
+
 func (a addModel) view() string {
 	var b strings.Builder
 	b.WriteString(styleBold.Render("  Add printer"))
-	b.WriteString(styleDim.Render("   step " + fmt.Sprint(int(a.step)+1) + " of 4 · esc back"))
+	b.WriteString(styleDim.Render("   " + a.stepLabel() + " · esc back"))
 	b.WriteString("\n\n")
 
 	if a.err != nil {
@@ -362,22 +378,44 @@ func (a addModel) deviceView() string {
 	}
 
 	var b strings.Builder
-	rows := a.listRows()
+	b.WriteString("  " + styleDim.Render("Where should jobs go?") + "\n\n")
+
+	rows := a.deviceRows()
 	start := scrollStart(a.devCursor, a.deviceCount(), rows)
 
 	for i := start; i < a.deviceCount() && i < start+rows; i++ {
-		label := styleDim.Render("Enter a URI manually…")
-		if i < len(a.devices) {
-			d := a.devices[i]
-			name := d.MakeModel
-			if name == "" || strings.EqualFold(name, "unknown") {
-				name = d.Info
-			}
-			label = styleValue.Render(truncate(name, 34)) + "  " + styleDim.Render(truncate(d.URI, a.width-46))
+		selected := i == a.devCursor
+		if i == len(a.choices) {
+			b.WriteString(cursorLine(selected, styleDim.Render("Enter a URI manually…")))
+			continue
 		}
-		b.WriteString(cursorLine(i == a.devCursor, label))
+
+		// One printer normally answers on several URIs under the very same
+		// make and model, so the transport is the only thing that tells the
+		// rows apart.
+		c := a.choices[i]
+		label := styleValue.Render(pad(truncate(cups.DeviceName(c.Device), 30), 30)) +
+			"  " + styleDim.Render(truncate(c.Label, a.width-48))
+		if c.Recommended {
+			label += styleAccentText.Render(" · recommended")
+		}
+		b.WriteString(cursorLine(selected, label))
+
+		if selected {
+			b.WriteString("      " + styleDim.Render(truncate(c.Display, a.width-8)) + "\n")
+		}
 	}
 	return b.String()
+}
+
+// deviceRows leaves room for the heading, its blank line and the URI spelled
+// out under the highlighted row.
+func (a addModel) deviceRows() int {
+	rows := a.listRows() - 3
+	if rows < 2 {
+		rows = 2
+	}
+	return rows
 }
 
 func (a addModel) driverView() string {

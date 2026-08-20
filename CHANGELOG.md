@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.1.6 — 2026-08-20
+
+- The device list when adding a printer says what each connection is. One
+  printer normally answers on several URIs under the very same make and model,
+  which left two rows that read identically and could only be told apart by a
+  long percent-encoded string. Every row now names its transport — "IPP/TLS ·
+  encrypted", "DNS-SD · IPP · not encrypted" — the best connection of a printer
+  comes first and is the only one marked as recommended, and the highlighted row
+  spells out its URI with the percent-encoding decoded.
+- Adding a printer no longer skips a step number. The header counted by the
+  wizard's internal order, so choosing a printer the scan had found went from
+  "step 1 of 4" to "step 3 of 4". Typing a URI by hand is the other way of
+  finishing the first step rather than a step of its own, and the count is out
+  of three because that is what the wizard asks for.
+- The message confirming a new printer is in English, like the rest of the
+  interface.
+
 ## v0.1.5 — 2026-08-20
 
 - A message in the footer — "… set as default.", "Transparent background." —
