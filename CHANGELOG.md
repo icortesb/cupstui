@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.4 — 2026-08-20
+
+- The driver advisory now recognises about 3,400 models — every one gutenprint
+  itself drives — instead of only the Epson L3150. Installing `gutenprint`
+  covers all of them, listed in `internal/drivers/gutenprint.json` and
+  regenerated from gutenprint's own printer list by `scripts/gen-driverdb.py`.
+
 ## v0.1.3 — 2026-08-20
 
 - Printers can be diagnosed: `i` on a printer turns its queue, connection,
