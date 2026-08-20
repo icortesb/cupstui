@@ -106,7 +106,12 @@ func (a *socketAdapter) SendRequestContext(ctx context.Context, url string, r *i
 	}
 	req.Header.Set("Content-Length", strconv.Itoa(size))
 	req.Header.Set("Content-Type", ipp.ContentTypeIPP)
-	req.Header.Set("Authorization", "Local "+a.cert())
+	// El certificado local solo lo lee root. Mandar el encabezado vacío hace
+	// que cupsd registre un error por cada pedido; sin encabezado, autentica
+	// por las credenciales del socket unix y no ensucia el error_log.
+	if cert := a.cert(); cert != "" {
+		req.Header.Set("Authorization", "Local "+cert)
+	}
 
 	resp, err := a.client.Do(req)
 	if err != nil {

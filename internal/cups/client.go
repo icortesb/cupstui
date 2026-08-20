@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os/user"
 	"sort"
+	"strconv"
 
 	ipp "github.com/phin1x/go-ipp"
 )
@@ -175,6 +176,27 @@ func (c *Client) CancelAllJobs(printer string) error {
 	return classifyNil(c.ipp.CancelAllJob(printer, false))
 }
 
+// HoldJob retiene un trabajo: queda en la cola pero no se imprime.
+func (c *Client) HoldJob(id int) error {
+	return c.sendJob(ipp.OperationHoldJob, id)
+}
+
+// ReleaseJob libera un trabajo retenido para que vuelva a la cola activa.
+func (c *Client) ReleaseJob(id int) error {
+	return c.sendJob(ipp.OperationReleaseJob, id)
+}
+
+func (c *Client) sendJob(op int16, id int) (err error) {
+	defer func() { err = classifyNil(recovered(recover(), err)) }()
+
+	req := ipp.NewRequest(op, 1)
+	req.OperationAttributes[ipp.AttributeJobURI] = jobURI(id)
+	req.OperationAttributes[ipp.AttributeRequestingUserName] = c.user
+
+	_, err = c.adapter.SendRequest(c.adapter.GetHttpUri("jobs", id), req, nil)
+	return err
+}
+
 // EnablePrinter reanuda una impresora detenida (equivale a cupsenable).
 func (c *Client) EnablePrinter(name string) error {
 	return classifyNil(c.ipp.ResumePrinter(name))
@@ -213,6 +235,10 @@ func (c *Client) sendAdmin(op int16, printer string) (err error) {
 
 func printerURI(name string) string {
 	return "ipp://localhost/printers/" + name
+}
+
+func jobURI(id int) string {
+	return "ipp://localhost/jobs/" + strconv.Itoa(id)
 }
 
 func classifyNil(err error) error {

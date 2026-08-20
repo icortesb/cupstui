@@ -178,3 +178,36 @@ func TestActionErrorsAreClassified(t *testing.T) {
 		t.Errorf("quiero KindForbidden, tengo %v", err)
 	}
 }
+
+func TestHoldJobSendsHoldJobOperation(t *testing.T) {
+	f := &fakeAdapter{}
+	if err := newTestClient(f).HoldJob(42); err != nil {
+		t.Fatalf("HoldJob: %v", err)
+	}
+	req := f.sentOperation(ipp.OperationHoldJob)
+	if req == nil {
+		t.Fatal("no se envió Hold-Job")
+	}
+	uri, _ := req.OperationAttributes[ipp.AttributeJobURI].(string)
+	if printerNameFromURI(uri) != "42" {
+		t.Errorf("job-uri = %q, quiero que apunte al trabajo 42", uri)
+	}
+}
+
+func TestReleaseJobSendsReleaseJobOperation(t *testing.T) {
+	f := &fakeAdapter{}
+	if err := newTestClient(f).ReleaseJob(42); err != nil {
+		t.Fatalf("ReleaseJob: %v", err)
+	}
+	if f.sentOperation(ipp.OperationReleaseJob) == nil {
+		t.Fatal("no se envió Release-Job")
+	}
+}
+
+func TestJobActionErrorsAreClassified(t *testing.T) {
+	f := &fakeAdapter{err: ipp.HTTPError{Code: 401}}
+	var cerr *Error
+	if err := newTestClient(f).HoldJob(1); !errors.As(err, &cerr) || cerr.Kind != KindForbidden {
+		t.Errorf("quiero KindForbidden, tengo %v", err)
+	}
+}

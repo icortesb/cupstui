@@ -77,3 +77,8 @@ func TestClassifyReturnsNilForNilError(t *testing.T) {
 		t.Errorf("classify(nil) = %v, quiero nil", e)
 	}
 }
+
+// asError es errors.As, con nombre propio para que los tests lean mejor.
+func asError(err error, target **Error) bool {
+	return errors.As(err, target)
+}

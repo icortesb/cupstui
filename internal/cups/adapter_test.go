@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -16,6 +17,12 @@ import (
 type fakeCUPS struct {
 	socket      string
 	connections *int64
+	headers     *atomic.Value // http.Header del último pedido
+}
+
+func (f *fakeCUPS) lastHeader(name string) string {
+	h, _ := f.headers.Load().(http.Header)
+	return h.Get(name)
 }
 
 func startFakeCUPS(t *testing.T) *fakeCUPS {
@@ -31,6 +38,8 @@ func startFakeCUPS(t *testing.T) *fakeCUPS {
 	t.Cleanup(func() { ln.Close() })
 
 	var conns int64
+	var headers atomic.Value
+	headers.Store(http.Header{})
 	srv := &http.Server{
 		ConnState: func(_ net.Conn, state http.ConnState) {
 			if state == http.StateNew {
@@ -38,6 +47,7 @@ func startFakeCUPS(t *testing.T) *fakeCUPS {
 			}
 		},
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			headers.Store(r.Header.Clone())
 			resp := &ipp.Response{
 				ProtocolVersionMajor: 2,
 				StatusCode:           ipp.StatusOk,
@@ -54,7 +64,7 @@ func startFakeCUPS(t *testing.T) *fakeCUPS {
 	go srv.Serve(ln)
 	t.Cleanup(func() { srv.Close() })
 
-	return &fakeCUPS{socket: sock, connections: &conns}
+	return &fakeCUPS{socket: sock, connections: &conns, headers: &headers}
 }
 
 func TestSocketAdapterReusesOneConnection(t *testing.T) {
@@ -123,5 +133,44 @@ func TestFindSocketFailsWhenNoneExists(t *testing.T) {
 	_, err := findSocket([]string{"/no/existe", "/tampoco"})
 	if classify(err).Kind != KindDaemonDown {
 		t.Errorf("quiero KindDaemonDown, tengo %v", err)
+	}
+}
+
+func TestSocketAdapterOmitsAuthorizationWhenThereIsNoCertificate(t *testing.T) {
+	// El certificado local de CUPS solo lo puede leer root. Mandar
+	// "Authorization: Local" con el valor vacío hace que cupsd escriba
+	// "Local authentication certificate not found." en su error_log por cada
+	// pedido, o sea decenas de líneas por minuto con el refresco automático.
+	// El pedido igual se autentica por las credenciales del socket unix.
+	fake := startFakeCUPS(t)
+	a := newSocketAdapter(fake.socket)
+	a.certPaths = []string{filepath.Join(t.TempDir(), "no-existe")}
+
+	req := ipp.NewRequest(ipp.OperationCupsGetPrinters, 1)
+	if _, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil); err != nil {
+		t.Fatalf("SendRequest: %v", err)
+	}
+
+	if got := fake.lastHeader("Authorization"); got != "" {
+		t.Errorf("se mandó Authorization = %q, no se esperaba ninguno", got)
+	}
+}
+
+func TestSocketAdapterSendsTheCertificateWhenItCanReadIt(t *testing.T) {
+	fake := startFakeCUPS(t)
+	cert := filepath.Join(t.TempDir(), "0")
+	if err := os.WriteFile(cert, []byte("abc123\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := newSocketAdapter(fake.socket)
+	a.certPaths = []string{cert}
+
+	req := ipp.NewRequest(ipp.OperationCupsGetPrinters, 1)
+	if _, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil); err != nil {
+		t.Fatalf("SendRequest: %v", err)
+	}
+
+	if got := fake.lastHeader("Authorization"); got != "Local abc123" {
+		t.Errorf("Authorization = %q, quiero \"Local abc123\"", got)
 	}
 }

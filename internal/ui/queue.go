@@ -50,8 +50,8 @@ func newQueue() queueModel {
 	f.TextStyle = styleValue
 	f.PlaceholderStyle = styleDim
 	f.Prompt = "/"
-	f.Placeholder = "usuario, documento, impresora o estado"
-	f.CharLimit = 60
+	f.Placeholder = "texto libre, o impresora:epson usuario:ana estado:retenido"
+	f.CharLimit = 80
 
 	return queueModel{table: t, filter: f}
 }

@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -28,9 +30,11 @@ const (
 	tabDashboard tab = iota
 	tabQueue
 	tabPrinters
+	tabPrint
+	tabLogs
 )
 
-var tabNames = []string{"Dashboard", "Cola", "Impresoras"}
+var tabNames = []string{"Dashboard", "Cola", "Impresoras", "Imprimir", "Logs"}
 
 type (
 	tickMsg     time.Time
@@ -40,6 +44,18 @@ type (
 	}
 	actionMsg struct {
 		text string
+		err  error
+	}
+	logsMsg struct {
+		lines []string
+		err   error
+	}
+	devicesMsg struct {
+		devices []cups.Device
+		err     error
+	}
+	ppdsMsg struct {
+		ppds []cups.PPD
 		err  error
 	}
 )
@@ -66,8 +82,12 @@ type Model struct {
 
 	queue    queueModel
 	printers printersModel
+	print    printModel
+	logs     logsModel
+	add      addModel
 
 	confirm     *confirmation
+	helpVP      viewport.Model
 	status      string
 	statusIsErr bool
 	showHelp    bool
@@ -80,6 +100,10 @@ func New(c *cups.Client) Model {
 	return Model{
 		client: c,
 		queue:  newQueue(),
+		print:  newPrint(),
+		logs:   newLogs(),
+		add:    newAdd(),
+		helpVP: viewport.New(80, 10),
 		width:  80,
 		height: 24,
 	}
@@ -117,14 +141,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.queue.setSize(m.width, m.bodyHeight()-2)
+		m.logs.setSize(m.width, m.bodyHeight()-2)
+		m.print.setSize(m.width, m.bodyHeight()-2)
+		m.add.setSize(m.width, m.bodyHeight())
+		m.helpVP.Width = m.width
+		m.helpVP.Height = m.bodyHeight()
+		m.helpVP.SetContent(helpView(m.width))
 		return m, nil
 
 	case tickMsg:
-		if m.refreshing {
-			return m, tickCmd()
+		cmds := []tea.Cmd{tickCmd()}
+		// El registro solo se lee cuando se está mirando: es E/S de disco que
+		// no hace falta pagar en las otras pestañas.
+		if m.tab == tabLogs {
+			cmds = append(cmds, readLog(m.logs.current()))
 		}
-		m.refreshing = true
-		return m, tea.Batch(m.refresh(), tickCmd())
+		if !m.refreshing {
+			m.refreshing = true
+			cmds = append(cmds, m.refresh())
+		}
+		return m, tea.Batch(cmds...)
 
 	case snapshotMsg:
 		m.refreshing = false
@@ -146,6 +182,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatus(msg.text, false)
 		}
 		return m, m.refresh()
+
+	case logsMsg:
+		m.logs.setLines(msg.lines, msg.err)
+		return m, nil
+
+	case devicesMsg:
+		m.add.loading = false
+		m.add.devices, m.add.err = msg.devices, msg.err
+		return m, nil
+
+	case ppdsMsg:
+		// Los drivers se cargan de fondo mientras se elige el dispositivo; si
+		// fallan, queda la opción sin driver.
+		m.add.ppds = msg.ppds
+		m.add.refreshMatches()
+		return m, nil
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -171,6 +223,43 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Con un campo de texto enfocado, o el buscador de archivos abierto, las
+	// teclas son del formulario: si no, los atajos globales (1..5, r, q, /)
+	// se comerían las letras de lo que se está escribiendo.
+	// El asistente de alta se queda con todas las teclas: tiene campos de texto
+	// y una lista propia.
+	if m.add.active {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, m.add.handleKey(msg, m.client)
+	}
+
+	if m.tab == tabPrint {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		if m.print.picking || m.print.editing() {
+			if msg.String() == "esc" {
+				if m.print.picking {
+					m.print.picking = false
+					return m, nil
+				}
+				// Sacar el foco del texto devuelve los atajos globales.
+				m.print.focus = fieldPrinter
+				m.print.applyFocus()
+				return m, nil
+			}
+			return m.handlePrintKey(msg)
+		}
+		// Sin un campo de texto activo, el formulario igual se queda con las
+		// teclas de navegación y de valor: h/l y ←/→ cambian la opción, no de
+		// pestaña. El resto (1..5, tab, q, r, ?) sigue siendo global.
+		if formKeys[msg.String()] {
+			return m.handlePrintKey(msg)
+		}
+	}
+
 	// Mientras se escribe el filtro, el campo de texto tiene prioridad.
 	if m.tab == tabQueue && m.queue.filtering {
 		switch msg.String() {
@@ -194,6 +283,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Help):
 		m.showHelp = !m.showHelp
+		if m.showHelp {
+			m.helpVP.SetContent(helpView(m.width))
+			m.helpVP.GotoTop()
+		}
 		return m, nil
 
 	case key.Matches(msg, keys.Escape):
@@ -224,17 +317,24 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Tab3):
 		m.tab = tabPrinters
 		return m, nil
+	case key.Matches(msg, keys.Tab4):
+		m.tab = tabPrint
+		return m, nil
+	case key.Matches(msg, keys.Tab5):
+		return m.goTo(tabLogs)
 
 	case key.Matches(msg, keys.NextTab):
-		m.tab = (m.tab + 1) % tab(len(tabNames))
-		return m, nil
+		return m.goTo((m.tab + 1) % tab(len(tabNames)))
 	case key.Matches(msg, keys.PrevTab):
-		m.tab = (m.tab + tab(len(tabNames)) - 1) % tab(len(tabNames))
-		return m, nil
+		return m.goTo((m.tab + tab(len(tabNames)) - 1) % tab(len(tabNames)))
 	}
 
+	// Con la ayuda abierta, las teclas de desplazamiento son suyas: no entra
+	// entera en una terminal corta.
 	if m.showHelp {
-		return m, nil
+		var cmd tea.Cmd
+		m.helpVP, cmd = m.helpVP.Update(msg)
+		return m, cmd
 	}
 
 	switch m.tab {
@@ -242,8 +342,110 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleQueueKey(msg)
 	case tabPrinters:
 		return m.handlePrintersKey(msg)
+	case tabPrint:
+		return m.handlePrintKey(msg)
+	case tabLogs:
+		return m.handleLogsKey(msg)
 	}
 	return m, nil
+}
+
+func (m Model) handlePrintKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.print.picking {
+		if msg.String() == "esc" {
+			m.print.picking = false
+			return m, nil
+		}
+		return m, m.print.updatePicker(msg)
+	}
+
+	switch msg.String() {
+	case "ctrl+o":
+		return m, m.print.openPicker()
+
+	case "enter":
+		return m.submitPrint()
+
+	case "up":
+		m.print.move(-1)
+		return m, nil
+	case "down":
+		m.print.move(1)
+		return m, nil
+	case "left", "-":
+		m.print.cycle(-1, m.snap.Printers)
+		return m, nil
+	case "right", "+":
+		m.print.cycle(1, m.snap.Printers)
+		return m, nil
+	}
+
+	// Con un campo de texto enfocado, las letras escriben; si no, j/k/h/l
+	// navegan como en el resto de la aplicación.
+	if !m.print.editing() {
+		switch msg.String() {
+		case "j":
+			m.print.move(1)
+			return m, nil
+		case "k":
+			m.print.move(-1)
+			return m, nil
+		case "h":
+			m.print.cycle(-1, m.snap.Printers)
+			return m, nil
+		case "l":
+			m.print.cycle(1, m.snap.Printers)
+			return m, nil
+		}
+	}
+
+	return m, m.print.update(msg)
+}
+
+// formKeys son las teclas que el formulario de impresión atiende aunque no
+// haya un campo de texto enfocado.
+var formKeys = map[string]bool{
+	"up": true, "down": true, "left": true, "right": true,
+	"j": true, "k": true, "h": true, "l": true,
+	"enter": true, "ctrl+o": true, "+": true, "-": true,
+}
+
+func (m Model) submitPrint() (tea.Model, tea.Cmd) {
+	path := m.print.file()
+	if path == "" {
+		m.setStatus("Elegí un archivo primero (ctrl+o para buscar).", true)
+		return m, nil
+	}
+
+	opts := m.print.options(m.snap.Printers)
+	name := filepath.Base(path)
+	return m, func() tea.Msg {
+		id, err := cups.Submit(path, opts)
+		if err != nil {
+			return actionMsg{err: err}
+		}
+		if id > 0 {
+			return actionMsg{text: fmt.Sprintf("%s enviado a imprimir (trabajo %d).", name, id)}
+		}
+		return actionMsg{text: name + " enviado a imprimir."}
+	}
+}
+
+// goTo cambia de pestaña y dispara la carga que esa pestaña necesite.
+func (m Model) goTo(t tab) (tea.Model, tea.Cmd) {
+	m.tab = t
+	if t == tabLogs {
+		return m, readLog(m.logs.current())
+	}
+	return m, nil
+}
+
+func (m Model) handleLogsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if key.Matches(msg, keys.NextLog) {
+		m.logs.nextFile()
+		return m, readLog(m.logs.current())
+	}
+	return m, m.logs.update(msg)
 }
 
 func (m Model) handleQueueKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -265,6 +467,22 @@ func (m Model) handleQueueKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}),
 		}
 		return m, nil
+
+	case key.Matches(msg, keys.HoldJob):
+		job, ok := m.queue.selected()
+		if !ok {
+			m.setStatus("No hay ningún trabajo seleccionado.", true)
+			return m, nil
+		}
+		c := m.client
+		if job.State == cups.JobHeld {
+			return m, action(fmt.Sprintf("Trabajo %d reanudado.", job.ID), func() error {
+				return c.ReleaseJob(job.ID)
+			})
+		}
+		return m, action(fmt.Sprintf("Trabajo %d pausado.", job.ID), func() error {
+			return c.HoldJob(job.ID)
+		})
 
 	case key.Matches(msg, keys.CancelAll):
 		if len(m.snap.Jobs) == 0 {
@@ -319,6 +537,9 @@ func (m Model) handlePrintersKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, action(fmt.Sprintf("%s es la impresora por omisión.", p.Name), func() error {
 			return c.SetDefault(p.Name)
 		})
+
+	case key.Matches(msg, keys.AddPrinter):
+		return m, m.add.start(m.client)
 
 	case key.Matches(msg, keys.Accepting):
 		accept := !p.Accepting
@@ -421,8 +642,11 @@ func (m Model) bannerView() string {
 }
 
 func (m Model) bodyView() string {
+	if m.add.active {
+		return m.add.view()
+	}
 	if m.showHelp {
-		return helpView()
+		return m.helpVP.View()
 	}
 	if !m.loaded && m.err != nil {
 		return styleDim.Render("\n  Sin datos todavía. Se reintenta cada " +
@@ -437,6 +661,10 @@ func (m Model) bodyView() string {
 		return m.queue.view(len(m.snap.Jobs))
 	case tabPrinters:
 		return m.printers.view(m.snap.Printers, m.width)
+	case tabPrint:
+		return m.print.view(m.snap.Printers, m.snap.Default)
+	case tabLogs:
+		return m.logs.view(m.width)
 	default:
 		return dashboardView(m.snap, m.width)
 	}
@@ -453,6 +681,10 @@ func (m Model) footerView() string {
 			style = styleStatusErr
 		}
 		return style.Width(m.width).Render(truncate(m.status, m.width-2))
+	}
+	if m.showHelp {
+		return styleStatusBar.Width(m.width).Render(
+			hint("j/k", "desplazar") + " · " + hint("?", "cerrar la ayuda"))
 	}
 	return styleStatusBar.Width(m.width).Render(shortHelp(m.tab, m.queue.filtering))
 }
