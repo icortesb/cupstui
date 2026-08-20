@@ -26,11 +26,21 @@ run: build
 install:
 	$(BUILDFLAGS) go install -ldflags="$(LDFLAGS)" $(PKG)
 
-# Records docs/demo.gif. Needs vhs (which pulls in ttyd and ffmpeg) and a
-# running CUPS: the tape queues held jobs, drives the interface and clears the
-# queue again.
+# Records docs/demo.gif. Needs vhs (which pulls in ttyd and ffmpeg), socat and a
+# running CUPS. The trap goes in before the fixture so the printers and the
+# configuration file are put back even if vhs fails halfway through.
 demo: build
-	PATH="$(CURDIR):$$PATH" vhs docs/demo.tape
+	@set -e; \
+	trap './scripts/demo-fixture.sh teardown' EXIT; \
+	./scripts/demo-fixture.sh setup; \
+	PATH="$(CURDIR):$$PATH" vhs docs/demo.tape; \
+	if command -v gifsicle >/dev/null 2>&1; then \
+		gifsicle -O3 --lossy=60 docs/demo.gif -o docs/demo.gif.tmp && \
+			mv docs/demo.gif.tmp docs/demo.gif; \
+		echo "optimised: $$(du -h docs/demo.gif | cut -f1)"; \
+	else \
+		echo "gifsicle not installed, leaving docs/demo.gif as recorded" >&2; \
+	fi
 
 clean:
 	rm -f $(BIN)

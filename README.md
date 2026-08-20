@@ -5,33 +5,11 @@ enable and disable printers, send files, add and remove queues, set per-printer
 quotas, read the daemon logs and export a usage report — without leaving the
 terminal or opening the CUPS web page.
 
-```
- cupstui    Dashboard    Queue   3   Printers    Print    History    Logs    ⟳ 08:25:18
-────────────────────────────────────────────────────────────────────────────────────────
-  1 printer   3 jobs queued
-
-╭──────────────────────────────╮
-│ Epson_L3150  ● idle          │
-│ default                      │
-│ Epson L3150 WiFi             │
-│ 3 jobs waiting               │
-╰──────────────────────────────╯
-```
+![cupstui](docs/demo.gif)
 
 The queue refreshes on its own every three seconds, and the tab carries its
-count so it can be watched from any other screen.
-
-```
-3 jobs
- ID      USER          DOCUMENT            PRINTER             STATE          TIME
-──────────────────────────────────────────────────────────────────────────────────────
- 24      icortes       recibo.pdf          Epson_L3150         held           08:25
- 23      icortes       factura.pdf         Epson_L3150         held           08:25
- 22      icortes       informe_anual.pdf   Epson_L3150         held           08:25
-```
-
-A job that is printing shows how far along it is, drawn from the sheet counts
-CUPS reports.
+count so it can be watched from any other screen. A job that is printing
+shows how far along it is, drawn from the sheet counts CUPS reports.
 
 ## Install
 

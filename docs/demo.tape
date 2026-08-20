@@ -2,32 +2,21 @@
 #
 #   make demo
 #
-# Needs vhs, which pulls in ttyd and ffmpeg. The queue is filled with held
-# jobs so nothing reaches paper, and emptied again at the end. The
-# configuration file is put back the way it was found.
+# The printers, the queue and the page log come from scripts/demo-fixture.sh,
+# which the Makefile runs around this tape.
 
 Output docs/demo.gif
 
 Set Shell zsh
 Set FontSize 15
-Set Width 1180
-Set Height 660
+Set Width 1140
+Set Height 520
 Set Padding 22
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 45ms
 
-# Setup, off camera: three jobs that will never print, and a configuration
-# that skips the first-run checks so the recording opens on the interface.
 Hide
-Type "mkdir -p /tmp/cupstui-demo && cd /tmp/cupstui-demo" Enter
-Type `printf 'annual report\n' > 'annual report.pdf'` Enter
-Type `printf 'invoice\n' > invoice.pdf` Enter
-Type `printf 'receipt\n' > receipt.pdf` Enter
-Type `for f in 'annual report.pdf' invoice.pdf receipt.pdf; do lp -H hold -t "$f" "$f" >/dev/null; done` Enter
-Type "mkdir -p ~/.config/cupstui" Enter
-Type "cp ~/.config/cupstui/config.json /tmp/cupstui-demo/config.bak 2>/dev/null" Enter
-Type `printf '{"seen":true}' > ~/.config/cupstui/config.json` Enter
-Type "clear" Enter
+Type "cd /tmp/cupstui-demo && clear" Enter
 Show
 
 Type "cupstui" Enter
@@ -45,31 +34,36 @@ Sleep 2s
 Escape
 Sleep 1s
 
-# Hold and release one job.
+# Cancel one job, with the confirmation.
 Type "j"
 Sleep 500ms
-Type "p"
-Sleep 2s
-
-# Cancel one, with the confirmation.
 Type "x"
 Sleep 1500ms
 Type "y"
 Sleep 2s
 
+# Release another, which then prints and leaves the queue.
+Type "p"
+Sleep 3s
+
 # Printers, and the quota editor.
 Type "3"
-Sleep 2s
+Sleep 1500ms
+Type "j"
+Sleep 1s
 Type "u"
 Sleep 2500ms
 Escape
 Sleep 500ms
 
-# Sending a file.
+# Sending a file. The first escape closes the browser, the second takes the
+# focus off the file field so the tab keys are global again.
 Type "4"
 Sleep 2s
 Ctrl+o
 Sleep 2500ms
+Escape
+Sleep 750ms
 Escape
 Sleep 500ms
 
@@ -79,15 +73,11 @@ Sleep 2s
 Type "s"
 Sleep 3s
 
-# The logs, tinted by level.
+# The logs, tinted by level, and n to cycle to the next one.
 Type "6"
 Sleep 2500ms
+Type "n"
+Sleep 3s
 
 Type "q"
 Sleep 1s
-
-# Teardown, off camera.
-Hide
-Type "cancel -a >/dev/null 2>&1" Enter
-Type "cp /tmp/cupstui-demo/config.bak ~/.config/cupstui/config.json 2>/dev/null || rm -f ~/.config/cupstui/config.json" Enter
-Type "rm -rf /tmp/cupstui-demo" Enter

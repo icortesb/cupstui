@@ -13,6 +13,18 @@ The suite runs without CUPS. One integration test talks to the local daemon and
 skips itself when it cannot reach one, so `go test ./...` passes on a machine
 with no printing stack.
 
+## Re-recording the demo
+
+```sh
+make demo   # needs vhs, socat and ghostscript
+```
+
+`scripts/demo-fixture.sh` builds the print system the recording shows: two
+queues pointed at a local socket that discards the data, a handful of completed
+jobs so the page log has rows, and three held jobs. Nothing reaches paper and no
+physical printer is needed. The Makefile runs the teardown from a trap, so the
+queues and `~/.config/cupstui/config.json` come back even if vhs fails partway.
+
 ## Working on it
 
 Behaviour comes with a test. The interesting parts of this program are the ones
