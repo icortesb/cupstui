@@ -60,8 +60,11 @@ func newPrint() printModel {
 	ranges.CharLimit = 40
 
 	fp := filepicker.New()
+	// Arranca en el directorio personal, pero se puede subir hasta la raíz con
+	// h o ←, así que se llega a cualquier lado.
 	fp.CurrentDirectory, _ = os.UserHomeDir()
 	fp.ShowHidden = false
+	fp.AutoHeight = false
 
 	m := printModel{
 		path:    path,
@@ -206,7 +209,13 @@ func (p *printModel) updatePicker(msg tea.Msg) tea.Cmd {
 
 func (p printModel) view(printers []cups.Printer, defaultPrinter string) string {
 	if p.picking {
-		return styleDim.Render("  Elegí un archivo — esc para volver\n") + "\n" + p.picker.View()
+		dir := p.picker.CurrentDirectory
+		if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(dir, home) {
+			dir = "~" + strings.TrimPrefix(dir, home)
+		}
+		header := "  " + styleLabel.Render("En ") + styleValue.Render(truncate(dir, p.width-8))
+		hints := "  " + styleDim.Render("j/k mover · l o → entrar · h o ← subir · enter elegir · esc cancelar")
+		return strings.Join([]string{header, hints, "", p.picker.View()}, "\n")
 	}
 
 	var b strings.Builder

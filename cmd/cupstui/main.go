@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/icortes/cupstui/internal/config"
 	"github.com/icortes/cupstui/internal/cups"
 	"github.com/icortes/cupstui/internal/ui"
 )
@@ -17,7 +18,15 @@ func main() {
 		"no pintar fondo propio y dejar ver el del terminal (puede afectar la legibilidad)")
 	flag.Parse()
 
-	ui.SetTransparent(*transparent)
+	// La preferencia guardada manda, salvo que se pase el flag explícitamente.
+	// La tecla T la cambia y la guarda durante la sesión.
+	setting := config.Load().Transparent
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "transparent" {
+			setting = *transparent
+		}
+	})
+	ui.SetTransparent(setting)
 
 	client, err := cups.New()
 	if err != nil {

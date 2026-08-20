@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/icortes/cupstui/internal/config"
 	"github.com/icortes/cupstui/internal/cups"
 )
 
@@ -43,6 +44,12 @@ type (
 		err  error
 	}
 	actionMsg struct {
+		text string
+		err  error
+	}
+	// statusMsg informa el resultado de algo que no cambia el estado de CUPS,
+	// así que no vale la pena refrescar la foto por él.
+	statusMsg struct {
 		text string
 		err  error
 	}
@@ -183,6 +190,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.refresh()
 
+	case statusMsg:
+		if msg.err != nil {
+			m.setStatus(describeError(msg.err), true)
+		} else {
+			m.setStatus(msg.text, false)
+		}
+		return m, nil
+
 	case logsMsg:
 		m.logs.setLines(msg.lines, msg.err)
 		return m, nil
@@ -201,6 +216,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	}
+
+	// El buscador de archivos se comunica con mensajes propios (el listado del
+	// directorio, entre otros). Si no se le reenvían, se queda vacío.
+	if m.print.picking {
+		return m, m.print.updatePicker(msg)
 	}
 
 	return m, nil
@@ -289,7 +310,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Transparent):
 		SetTransparent(!transparent)
 		m.restyle()
-		return m, nil
+		return m, rememberTransparency(transparent)
 
 	case key.Matches(msg, keys.Help):
 		m.showHelp = !m.showHelp
@@ -596,6 +617,20 @@ func (m *Model) resize() {
 	m.helpVP.Width = m.width
 	m.helpVP.Height = body
 	m.helpVP.SetContent(helpView(m.width))
+}
+
+// rememberTransparency guarda la preferencia para la próxima sesión.
+func rememberTransparency(on bool) tea.Cmd {
+	return func() tea.Msg {
+		text := "Fondo propio. Se recordará para la próxima vez."
+		if on {
+			text = "Fondo del terminal. Se recordará para la próxima vez."
+		}
+		if err := config.Save(config.Config{Transparent: on}); err != nil {
+			return statusMsg{err: fmt.Errorf("no se pudo guardar la preferencia: %w", err)}
+		}
+		return statusMsg{text: text}
+	}
 }
 
 // restyle vuelve a aplicar los estilos a los componentes que se los guardaron

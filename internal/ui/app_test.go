@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -278,5 +279,46 @@ func TestTransparencyCanBeToggledAtRuntime(t *testing.T) {
 			t.Errorf("línea %d quedó sin pintar al volver del modo transparente", i)
 			break
 		}
+	}
+}
+
+// El buscador de archivos pide el contenido del directorio con un comando, y
+// la respuesta llega como un mensaje cualquiera. Si el modelo raíz no le
+// reenvía los mensajes que no son teclas, el listado nunca le llega y muestra
+// "Bummer. No Files Found." aunque el directorio esté lleno.
+func TestFilePickerReceivesItsDirectoryListing(t *testing.T) {
+	withColor(t)
+	m := testModel()
+	m.tab = tabPrint
+
+	cmd := m.print.openPicker()
+	if cmd == nil {
+		t.Fatal("abrir el buscador tiene que pedir el listado")
+	}
+
+	// Se ejecuta el comando y su mensaje se mete por el Update del modelo raíz,
+	// igual que haría bubbletea.
+	next, _ := m.Update(cmd())
+	m = next.(Model)
+
+	view := m.print.picker.View()
+	if strings.Contains(view, "Bummer") {
+		t.Errorf("el buscador quedó vacío:\n%s", view)
+	}
+	if strings.TrimSpace(view) == "" {
+		t.Error("el buscador no dibujó nada")
+	}
+}
+
+func TestFilePickerStartsInTheHomeDirectory(t *testing.T) {
+	m := testModel()
+	m.print.openPicker()
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("sin directorio personal")
+	}
+	if got := m.print.picker.CurrentDirectory; got != home {
+		t.Errorf("el buscador arranca en %q, quiero %q", got, home)
 	}
 }
