@@ -1,9 +1,13 @@
 package ui
 
 import (
+	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 // Palette. ANSI 256 colours, so it works in any terminal, with a light and a
@@ -49,7 +53,48 @@ var (
 	styleErrText     lipgloss.Style
 )
 
-func init() { SetTransparent(false) }
+func init() {
+	useTerminfoColors()
+	SetTransparent(false)
+}
+
+// useTerminfoColors asks terminfo what the terminal can do when the name alone
+// does not say. lipgloss reads TERM for the word "color", which foot,
+// alacritty, wezterm and the rest do not carry: they announce themselves
+// through COLORTERM instead, and that one is lost across ssh and inside a
+// misconfigured tmux, leaving a perfectly capable terminal drawn in no colour
+// at all. terminfo is the database built to answer this, so it gets asked.
+func useTerminfoColors() {
+	term := os.Getenv("TERM")
+	if term == "" || term == "dumb" {
+		return
+	}
+	// What lipgloss itself looks at. Asking it directly instead would make it
+	// query the terminal for its background before the program owns the input,
+	// and the answer would arrive with nobody reading.
+	if os.Getenv("COLORTERM") != "" ||
+		strings.Contains(term, "color") || strings.Contains(term, "ansi") {
+		return
+	}
+
+	out, err := exec.Command("tput", "colors").Output()
+	if err != nil {
+		return
+	}
+	colors, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return
+	}
+
+	switch {
+	case colors >= 1<<24:
+		lipgloss.SetColorProfile(termenv.TrueColor)
+	case colors >= 256:
+		lipgloss.SetColorProfile(termenv.ANSI256)
+	case colors >= 8:
+		lipgloss.SetColorProfile(termenv.ANSI)
+	}
+}
 
 // SetTransparent rebuilds the styles. Call it before New.
 func SetTransparent(v bool) {

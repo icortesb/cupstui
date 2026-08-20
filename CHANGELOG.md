@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.1.11 — 2026-08-20
+
+- A narrow terminal keeps its navigation. The header and the row of key hints
+  were laid out at their natural width and left to wrap when the screen was
+  smaller, and every wrapped line pushed the screen down until the tabs
+  scrolled off the top — on the Queue and the Printers tabs first, the two with
+  the longest hints. Nothing is drawn wider than the terminal any more, and
+  when the header cannot fit it gives up the clock and the server name first,
+  then the application's own name, and keeps the tab you are on to the last.
+- Colours appear in terminals whose name does not contain "color" — foot,
+  alacritty, wezterm and the rest. They announce their colours through
+  `COLORTERM`, which does not survive ssh or a plainly configured tmux, and
+  without it the whole interface was drawn in no colour at all. terminfo is now
+  asked what the terminal can do.
+
 ## v0.1.10 — 2026-08-20
 
 - The install script sets up the PATH for whichever shell you actually use.

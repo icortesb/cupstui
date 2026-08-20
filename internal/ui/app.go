@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/icortesb/cupstui/internal/config"
 	"github.com/icortesb/cupstui/internal/cups"
@@ -916,6 +917,28 @@ func (m Model) bodyHeight() int {
 	return h
 }
 
+// fit keeps the screen within the terminal. A line wider than the screen is
+// not cut by the terminal but wrapped onto the next row, which pushes
+// everything down until the top scrolls away — and the top is the navigation,
+// the one thing that has to stay. Cutting the line instead costs the end of a
+// row of key hints and keeps the shape of the screen.
+func fit(view string, width, height int) string {
+	lines := strings.Split(view, "\n")
+	if height > 0 && len(lines) > height {
+		lines = lines[:height]
+	}
+	// A width of zero is a size not known yet, not a screen with no room:
+	// cutting to it would blank the interface until the first resize arrives.
+	if width > 0 {
+		for i, line := range lines {
+			if lipgloss.Width(line) > width {
+				lines[i] = ansi.Truncate(line, width, "…")
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (m Model) View() string {
 	// The startup screen replaces the interface rather than overlaying it:
 	// until the checks answer, there is nothing trustworthy to show behind.
@@ -942,7 +965,7 @@ func (m Model) View() string {
 
 	// The whole screen is painted so no gaps are left for the terminal
 	// background to show through.
-	return paintBackground(b.String(), m.width)
+	return paintBackground(fit(b.String(), m.width, m.height), m.width)
 }
 
 func (m Model) headerView() string {
@@ -973,6 +996,25 @@ func (m Model) headerView() string {
 	if server := m.serverLabel(); server != "" {
 		right = m.serverStyle().Render(server) + styleDim.Render("  ") + right
 	}
+
+	// What goes when the screen is too narrow, in order: the clock and the
+	// server name, then the application's own name, then every tab but the one
+	// being looked at. Which tab you are on is worth more than all of it.
+	fits := func() bool {
+		// A width not known yet is not a narrow screen: nothing is dropped
+		// until there is a size to judge against.
+		return m.width <= 0 || lipgloss.Width(left)+lipgloss.Width(right)+1 <= m.width
+	}
+	if !fits() {
+		right = ""
+	}
+	if !fits() {
+		left = lipgloss.JoinHorizontal(lipgloss.Bottom, tabs...)
+	}
+	if !fits() {
+		left = styleTabActive.Render(tabNames[m.tab])
+	}
+
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right)
 	if gap < 1 {
 		gap = 1

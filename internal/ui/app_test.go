@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/icortesb/cupstui/internal/cups"
@@ -536,5 +537,66 @@ func TestALateExpiryDoesNotWipeANewerStatus(t *testing.T) {
 	m = next.(Model)
 	if m.status != "second" {
 		t.Errorf("a late expiry wiped a newer message: status = %q", m.status)
+	}
+}
+
+// The screen is exactly as tall and as wide as the terminal, whatever the
+// size. A header or a footer that wraps instead of being cut adds lines the
+// terminal does not have, and the alt screen answers by scrolling the top
+// away: the navigation goes first, which is the one thing that must never be
+// lost.
+func TestNarrowScreensKeepTheNavigation(t *testing.T) {
+	withColor(t)
+
+	sizes := []struct{ w, h int }{{100, 20}, {80, 24}, {60, 14}, {50, 12}, {40, 10}, {30, 8}, {20, 8}}
+	tabs := []struct {
+		name string
+		tab  tab
+	}{{"dashboard", tabDashboard}, {"queue", tabQueue}, {"printers", tabPrinters},
+		{"print", tabPrint}, {"history", tabHistory}, {"logs", tabLogs}}
+
+	for _, size := range sizes {
+		for _, tc := range tabs {
+			m := testModel()
+			m.tab = tc.tab
+			updated, _ := m.Update(tea.WindowSizeMsg{Width: size.w, Height: size.h})
+			m = updated.(Model)
+
+			view := m.View()
+			if got := lipgloss.Height(view); got != size.h {
+				t.Errorf("%s at %dx%d: %d lines, want %d",
+					tc.name, size.w, size.h, got, size.h)
+			}
+			for i, line := range strings.Split(view, "\n") {
+				if got := lipgloss.Width(line); got > size.w {
+					t.Errorf("%s at %dx%d: line %d is %d wide",
+						tc.name, size.w, size.h, i+1, got)
+				}
+			}
+			// The first line is the navigation, and it still names the tab
+			// the user is on.
+			first := strings.Split(view, "\n")[0]
+			if !strings.Contains(stripANSI(first), tabNames[tc.tab]) {
+				t.Errorf("%s at %dx%d: navigation lost the current tab, got %q",
+					tc.name, size.w, size.h, stripANSI(first))
+			}
+		}
+	}
+}
+
+// stripANSI leaves only what the eye sees, so a test can look for a word
+// without the styling around it.
+func stripANSI(s string) string {
+	return ansi.Strip(s)
+}
+
+// Before the first resize arrives the size is zero, which is "not known yet"
+// rather than "no room": the interface still has to draw something.
+func TestUnknownSizeStillDraws(t *testing.T) {
+	withColor(t)
+	m := testModel()
+	m.width, m.height = 0, 0
+	if view := stripANSI(m.View()); !strings.Contains(view, "cupstui") {
+		t.Errorf("nothing drawn at an unknown size: %q", view)
 	}
 }
