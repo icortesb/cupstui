@@ -56,6 +56,12 @@ Sleep 2500ms
 Escape
 Sleep 500ms
 
+# Diagnosing a printer.
+Type "i"
+Sleep 2500ms
+Escape
+Sleep 500ms
+
 # Sending a file. The first escape closes the browser, the second takes the
 # focus off the file field so the tab keys are global again.
 Type "4"

@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.3 — 2026-08-20
+
+- Printers can be diagnosed: `i` on a printer turns its queue, connection,
+  driver and last job into a short list of checks, each explained in plain
+  text rather than as a raw IPP attribute. When the make and model is
+  recognised, the screen also names the driver package and the command that
+  installs it — shown, never run.
+
 ## v0.1.2 — 2026-08-20
 
 - The startup checks no longer report administrative access as denied when CUPS

@@ -17,7 +17,7 @@ func helpView(width int) string {
 	sections := []helpSection{
 		{"Navigation", []key.Binding{keys.Down, keys.NextTab, keys.PrevTab, keys.Tab1, keys.Tab2, keys.Tab3, keys.Tab4, keys.Tab5, keys.Tab6}},
 		{"Queue", []key.Binding{keys.HoldJob, keys.Cancel, keys.CancelAll, keys.Filter}},
-		{"Printers", []key.Binding{keys.Toggle, keys.Default, keys.Accepting, keys.AddPrinter, keys.DeletePrinter, keys.Policy}},
+		{"Printers", []key.Binding{keys.Toggle, keys.Default, keys.Accepting, keys.AddPrinter, keys.DeletePrinter, keys.Policy, keys.Diagnose}},
 		{"Print", []key.Binding{
 			key.NewBinding(key.WithKeys("down"), key.WithHelp("↑↓ j/k", "change field")),
 			key.NewBinding(key.WithKeys("left"), key.WithHelp("←→ h/l", "change value")),
@@ -95,7 +95,7 @@ func shortHelp(t tab, filtering bool) string {
 	case tabLogs:
 		return hint("j/k", "scroll") + " · " + hint("G", "jump to end") + " · " + hint("n", "next log") + " · " + common
 	case tabPrinters:
-		return hint("j/k", "move") + " · " + hint("e", "enable") + " · " + hint("d", "default") + " · " + hint("a", "accept") + " · " + hint("A", "add") + " · " + hint("x", "remove") + " · " + hint("u", "quotas") + " · " + common
+		return hint("j/k", "move") + " · " + hint("e", "enable") + " · " + hint("d", "default") + " · " + hint("a", "accept") + " · " + hint("A", "add") + " · " + hint("x", "remove") + " · " + hint("u", "quotas") + " · " + hint("i", "diagnose") + " · " + common
 	default:
 		return common
 	}

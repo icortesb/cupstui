@@ -82,6 +82,13 @@ func Preflight(ctx context.Context, c *Client, out chan<- CheckResult) {
 
 func checkService(ctx context.Context, c *Client) CheckResult {
 	snap, err := c.Snapshot(ctx)
+	return snapshotCheckResult(c, snap, err)
+}
+
+// snapshotCheckResult reports on a Snapshot already fetched elsewhere, so a
+// caller that needs the snapshot for other checks too — DiagnosePrinter, for
+// one — doesn't have to fetch it twice to get this same check.
+func snapshotCheckResult(c *Client, snap Snapshot, err error) CheckResult {
 	if err != nil {
 		return CheckResult{
 			Name:   checkDaemon,

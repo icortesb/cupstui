@@ -56,6 +56,9 @@ type Job struct {
 	// printed so far. CUPS reports both only once the job reaches the printer.
 	Sheets     int
 	SheetsDone int
+	// Reasons is job-state-reasons, cupsd's explanation for the state above —
+	// "job-canceled-by-user", "cups-missing-filter-error" and the like.
+	Reasons []string
 }
 
 // Progress is how far along a printing job is, and whether that is known at
@@ -80,6 +83,13 @@ func jobFromAttributes(id int, a ipp.Attributes) Job {
 		KOctets:    attrInt(a, "job-k-octets"),
 		Sheets:     attrInt(a, "job-media-sheets"),
 		SheetsDone: attrInt(a, "job-media-sheets-completed"),
+	}
+
+	for _, r := range attrStrings(a, "job-state-reasons") {
+		// CUPS sends "none" when there is nothing to report.
+		if r != "" && r != "none" {
+			j.Reasons = append(j.Reasons, r)
+		}
 	}
 
 	uri := attrString(a, "job-printer-uri")

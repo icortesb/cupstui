@@ -76,6 +76,10 @@ type (
 		ppds []cups.PPD
 		err  error
 	}
+	diagnoseMsg struct {
+		result cups.PrinterDiagnosis
+		err    error
+	}
 )
 
 // confirmation is a destructive action waiting for the user to say yes.
@@ -105,6 +109,7 @@ type Model struct {
 	logs      logsModel
 	add       addModel
 	policy    policyModel
+	diagnose  diagnoseModel
 	preflight preflightModel
 	password  passwordModel
 
@@ -127,6 +132,7 @@ func New(c *cups.Client) Model {
 		logs:      newLogs(),
 		add:       newAdd(),
 		policy:    newPolicy(),
+		diagnose:  newDiagnose(),
 		preflight: newPreflight(),
 		password:  newPassword(),
 		helpVP:    viewport.New(80, 10),
@@ -257,6 +263,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.add.spin, cmd = m.add.spin.Update(msg)
 			return m, cmd
 		}
+		if m.diagnose.active && m.diagnose.loading {
+			var cmd tea.Cmd
+			m.diagnose.spin, cmd = m.diagnose.spin.Update(msg)
+			return m, cmd
+		}
 		return m, nil
 
 	case devicesMsg:
@@ -269,6 +280,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// fails, the driverless option remains.
 		m.add.ppds = msg.ppds
 		m.add.refreshMatches()
+		return m, nil
+
+	case diagnoseMsg:
+		m.diagnose.loading = false
+		m.diagnose.result, m.diagnose.err = msg.result, msg.err
 		return m, nil
 
 	case tea.KeyMsg:
@@ -339,6 +355,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		return m, m.policy.handleKey(msg)
+	}
+
+	// The diagnosis screen has no text field, but it still takes every key
+	// while open: r and esc must not fall through to the global shortcuts.
+	if m.diagnose.active {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, m.diagnose.handleKey(msg, m.client)
 	}
 
 	// tab and shift+tab always switch tabs: in the form the ←/→ arrows change
@@ -722,6 +747,9 @@ func (m Model) handlePrintersKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Policy):
 		return m, m.policy.start(p)
 
+	case key.Matches(msg, keys.Diagnose):
+		return m, m.diagnose.start(c, p)
+
 	case key.Matches(msg, keys.DeletePrinter):
 		c := m.client
 		queued := jobsFor(m.snap.Jobs, p.Name)
@@ -777,6 +805,7 @@ func (m *Model) resize() {
 	m.print.setSize(m.width, body-2)
 	m.history.setSize(m.width, body-2)
 	m.add.setSize(m.width, body)
+	m.diagnose.setSize(m.width, body)
 	m.policy.setSize(m.width)
 	m.preflight.setSize(m.width)
 	m.password.setSize(m.width)
@@ -976,6 +1005,9 @@ func (m Model) bodyView() string {
 	}
 	if m.policy.active {
 		return m.policy.view()
+	}
+	if m.diagnose.active {
+		return m.diagnose.view()
 	}
 	if m.password.active {
 		return m.password.view()

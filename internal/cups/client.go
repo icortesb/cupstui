@@ -119,6 +119,7 @@ var jobAttributes = []string{
 	"job-originating-user-name",
 	"job-printer-uri",
 	"job-state",
+	"job-state-reasons",
 	"time-at-creation",
 	"job-k-octets",
 	"job-media-sheets",
@@ -169,6 +170,24 @@ func (c *Client) getJobs(ctx context.Context) (jobs map[int]ipp.Attributes, err 
 	// whichJobs "not-completed" is the live queue; myJobs=false shows every
 	// user's jobs.
 	return c.ipp.GetJobsContext(ctx, "", "", "not-completed", false, 0, 0, jobAttributes)
+}
+
+// RecentJobs returns a printer's most recent finished jobs, newest first.
+// Canceled and aborted are "completed" states in IPP's terms, so they never
+// show up in Snapshot.Jobs, which only asks for "not-completed" — this is
+// the one call that can see whether a job actually failed.
+func (c *Client) RecentJobs(ctx context.Context, printer string, max int) (jobs []Job, err error) {
+	defer func() { err = classifyNil(recovered(recover(), err)) }()
+
+	raw, err := c.ipp.GetJobsContext(ctx, printer, "", "completed", false, 0, max, jobAttributes)
+	if err != nil {
+		return nil, err
+	}
+	for id, a := range raw {
+		jobs = append(jobs, jobFromAttributes(id, a))
+	}
+	sortJobs(jobs)
+	return jobs, nil
 }
 
 func (c *Client) getDefault(ctx context.Context) (name string, err error) {

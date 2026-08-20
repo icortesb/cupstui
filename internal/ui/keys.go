@@ -27,6 +27,7 @@ type keyMap struct {
 	AddPrinter    key.Binding
 	DeletePrinter key.Binding
 	Policy        key.Binding
+	Diagnose      key.Binding
 	Help          key.Binding
 	Transparent   key.Binding
 	SignIn        key.Binding
@@ -59,6 +60,7 @@ var keys = keyMap{
 	AddPrinter:    key.NewBinding(key.WithKeys("A", "+"), key.WithHelp("A", "add printer")),
 	DeletePrinter: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "remove printer")),
 	Policy:        key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "quotas and access")),
+	Diagnose:      key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "diagnose")),
 	Help:          key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 	Transparent:   key.NewBinding(key.WithKeys("T"), key.WithHelp("T", "toggle transparent background")),
 	SignIn:        key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "sign in to a remote server")),

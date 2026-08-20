@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/icortesb/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/drivers"
 )
 
 func testModel() Model {
@@ -32,6 +33,7 @@ func testModel() Model {
 	m.logs.setSize(m.width, 10)
 	m.print.setSize(m.width, 10)
 	m.add.setSize(m.width, 10)
+	m.diagnose.setSize(m.width, 10)
 	m.history.setSize(m.width, 10)
 	m.policy.setSize(m.width)
 	m.preflight.setSize(m.width)
@@ -126,6 +128,28 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 			m.add.step = stepDetails
 			m.add.chosenURI = "lpd://1.2.3.4:515/x"
 			m.add.chosenPPD = "a.ppd"
+		}},
+		{"diagnose: loading", func(m *Model) {
+			m.diagnose.active = true
+			m.diagnose.loading = true
+			m.diagnose.printer = m.snap.Printers[0]
+		}},
+		{"diagnose: results", func(m *Model) {
+			m.diagnose.active = true
+			m.diagnose.printer = m.snap.Printers[0]
+			m.diagnose.advice, m.diagnose.hasAdvice = drivers.Info{
+				Vendor: "Epson", Model: "L3150", Package: "epson-inkjet-printer-escpr",
+				Source: "AUR", InstallHint: "yay -S epson-inkjet-printer-escpr",
+			}, true
+			m.diagnose.result = cups.PrinterDiagnosis{
+				Printer: "Epson_L3150",
+				Overall: cups.CheckFail,
+				Checks: []cups.CheckResult{
+					{Name: "CUPS service", Status: cups.CheckOK, Detail: "running"},
+					{Name: "Driver", Status: cups.CheckFail, Detail: "the filter needed to process jobs is missing",
+						Hint: "reinstall or reconfigure the printer's driver"},
+				},
+			}
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -398,6 +422,36 @@ func TestRemovingAnEmptyPrinterAsksPlainly(t *testing.T) {
 	}
 	if strings.Contains(m.confirm.prompt, "queued") {
 		t.Errorf("prompt = %q, should not mention jobs when there are none", m.confirm.prompt)
+	}
+}
+
+func TestDiagnoseOpensForTheSelectedPrinter(t *testing.T) {
+	withColor(t)
+	m := testModel()
+	m.tab = tabPrinters
+	m.printers.cursor = 1 // HP_LaserJet
+
+	next, _ := m.Update(press("i"))
+	m = next.(Model)
+
+	if !m.diagnose.active {
+		t.Fatal("pressing i on the Printers tab must open the diagnosis screen")
+	}
+	if m.diagnose.printer.Name != "HP_LaserJet" {
+		t.Errorf("diagnosing %q, want the selected printer HP_LaserJet", m.diagnose.printer.Name)
+	}
+}
+
+func TestEscapeClosesTheDiagnosisScreen(t *testing.T) {
+	withColor(t)
+	m := testModel()
+	m.diagnose.active = true
+
+	next, _ := m.Update(press("esc"))
+	m = next.(Model)
+
+	if m.diagnose.active {
+		t.Error("esc must close the diagnosis screen")
 	}
 }
 
