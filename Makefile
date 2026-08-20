@@ -1,10 +1,13 @@
 BIN := cupstui
 PKG := ./cmd/cupstui
 
+# What a local build calls itself, so -version says something truer than "dev".
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
 # CGO is off and the symbol table stripped: the result is a single static
 # binary that runs on any Linux with no library to match.
 BUILDFLAGS := CGO_ENABLED=0
-LDFLAGS := -s -w
+LDFLAGS := -s -w -X main.version=$(VERSION)
 
 .PHONY: build test vet fmt run install demo clean
 

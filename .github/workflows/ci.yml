@@ -33,6 +33,11 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # install.sh is the first thing anyone runs, and it is the one piece
+      # here the Go suite cannot cover.
+      - name: Shell scripts
+        run: shellcheck scripts/*.sh
+
       # The suite runs without CUPS: the one test that needs a live daemon
       # skips itself when it cannot reach one.
       - name: Test

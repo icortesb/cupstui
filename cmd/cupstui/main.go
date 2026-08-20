@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -16,6 +17,28 @@ import (
 // version is set at build time by the release pipeline.
 var version = "dev"
 
+// buildVersion is the version to report. A release stamps it in; a
+// `go install github.com/icortesb/cupstui/cmd/cupstui@latest` build stamps
+// nothing, and carries the module version in its build info instead.
+func buildVersion(stamped, module string) string {
+	if stamped != "dev" {
+		return stamped
+	}
+	// A build straight from the working tree reports "(devel)", which says
+	// less than "dev" does.
+	if module != "" && module != "(devel)" {
+		return module
+	}
+	return stamped
+}
+
+func moduleVersion() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		return info.Main.Version
+	}
+	return ""
+}
+
 func main() {
 	transparent := flag.Bool("transparent", false,
 		"do not paint a background; let the terminal show through")
@@ -25,7 +48,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println("cupstui", version)
+		fmt.Println("cupstui", buildVersion(version, moduleVersion()))
 		return
 	}
 

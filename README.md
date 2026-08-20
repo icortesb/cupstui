@@ -13,11 +13,31 @@ shows how far along it is, drawn from the sheet counts CUPS reports.
 
 ## Install
 
-Download a binary from the [releases](https://github.com/icortesb/cupstui/releases),
-or:
+```sh
+curl -fsSL https://raw.githubusercontent.com/icortesb/cupstui/main/scripts/install.sh | sh
+```
+
+That takes the release build for this machine, checks it against the published
+checksum and leaves it in `~/.local/bin`, which most distributions already have
+on the PATH — and when yours does not, it says so and gives you the line to add.
+`CUPSTUI_INSTALL_DIR` puts it somewhere else, `CUPSTUI_VERSION` pins a tag.
+
+Or take the tarball for your architecture from the
+[releases](https://github.com/icortesb/cupstui/releases) and move the binary
+onto your PATH yourself.
+
+With Go:
 
 ```sh
 go install github.com/icortesb/cupstui/cmd/cupstui@latest
+```
+
+This one leaves the binary in `$(go env GOPATH)/bin`, which is on the PATH only
+if you have put it there — `cupstui: command not found` right after a successful
+install means you have not:
+
+```sh
+export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 
 From source:

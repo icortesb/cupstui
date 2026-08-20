@@ -128,8 +128,8 @@ print_history() {
 }
 
 wait_for_empty_queue() {
-	local i
-	for i in $(seq 60); do
+	local _
+	for _ in $(seq 60); do
 		if [[ -z $(lpstat -o 2>/dev/null) ]]; then
 			log "queue drained"
 			return 0

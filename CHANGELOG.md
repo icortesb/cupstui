@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.7 — 2026-08-20
+
+- A first install no longer ends in `cupstui: command not found`. There is an
+  install script now — `curl -fsSL .../scripts/install.sh | sh` — which takes
+  the release build for the machine it runs on, checks it against the published
+  checksum and leaves it in `~/.local/bin`, saying plainly where the binary went
+  and what to add to the PATH when that directory is not on it. `go install`
+  cannot do any of that, so the README stops leading with it and spells out the
+  `$(go env GOPATH)/bin` caveat where it is still offered.
+- `-version` reports the real version after `go install`, which used to answer
+  "dev" because only the release pipeline stamps one in. It now falls back to
+  the module version the build carries. A build from a clone says which commit
+  it came from for the same reason.
+
 ## v0.1.6 — 2026-08-20
 
 - The device list when adding a printer says what each connection is. One
