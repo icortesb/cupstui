@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.1.9 — 2026-08-20
+
+- The install script puts cupstui on the PATH instead of only saying how. It
+  left the binary in `~/.local/bin` and printed the line to add, which on a
+  distribution that does not already have that directory on the PATH still ended
+  in `cupstui: command not found` — the one thing the script exists to prevent.
+  The line now goes into the startup files the shell actually reads, bash and
+  zsh alike, once however many times the script is run;
+  `CUPSTUI_NO_MODIFY_PATH` keeps the old behaviour of printing it for you to add
+  yourself.
+
 ## v0.1.8 — 2026-08-20
 
 - The interface starts on a machine that has no printers yet. Asked for the

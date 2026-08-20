@@ -65,11 +65,54 @@ mv "$dir/cupstui.new" "$dir/cupstui"
 case ":$PATH:" in
 	*":$dir:"*)
 		echo "cupstui $tag is in $dir. Run it: cupstui"
-		;;
-	*)
-		echo "cupstui $tag is in $dir, which is not on your PATH."
-		echo "Put this line in ~/.bashrc or ~/.zshrc, then open a new shell:"
-		echo
-		echo "  export PATH=\"$dir:\$PATH\""
+		exit 0
 		;;
 esac
+
+line="export PATH=\"$dir:\$PATH\""
+
+manual() {
+	echo "cupstui $tag is in $dir, which is not on your PATH."
+	echo "Put this line in your shell's startup file, then open a new shell:"
+	echo
+	echo "  $line"
+}
+
+# Printing the line and leaving it at that ends in "command not found", which
+# is the whole thing this script exists to avoid, so the line goes in. Set
+# CUPSTUI_NO_MODIFY_PATH to be told what to add and add it yourself.
+if [ -n "${CUPSTUI_NO_MODIFY_PATH:-}" ]; then
+	manual
+	exit 0
+fi
+
+# Every startup file the user actually has, so a bash user who later opens zsh
+# still finds the binary. A file already mentioning the directory is left
+# alone: running this script twice should not stack up lines.
+written=
+for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+	[ -f "$rc" ] || continue
+	if grep -qF "$dir" "$rc" 2>/dev/null; then
+		written="$written $rc"
+		continue
+	fi
+	printf '\n# added by cupstui install.sh\n%s\n' "$line" >> "$rc" 2>/dev/null &&
+		written="$written $rc"
+done
+
+# With no startup file at all, ~/.profile is the one every POSIX login shell
+# reads.
+if [ -z "$written" ] &&
+	printf '\n# added by cupstui install.sh\n%s\n' "$line" >> "$HOME/.profile" 2>/dev/null; then
+	written=" $HOME/.profile"
+fi
+
+if [ -z "$written" ]; then
+	manual
+	exit 0
+fi
+
+echo "cupstui $tag is in $dir, and the PATH line was added to:$written"
+echo "Open a new shell, or run this in the current one:"
+echo
+echo "  $line"
