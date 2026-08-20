@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -471,5 +472,69 @@ func TestSignInIsOfferedWhenTheServerAsksForCredentials(t *testing.T) {
 		if cmd := m.offerSignIn(&cups.Error{Kind: kind}); cmd == nil {
 			t.Errorf("kind %v: no sign-in was offered", kind)
 		}
+	}
+}
+
+// The footer has one line, shared between a status message and the key hints.
+// A message that never expires takes the hints away for the rest of the
+// session.
+func TestAStatusMessageExpiresSoTheHintsComeBack(t *testing.T) {
+	withColor(t)
+	m := testModel()
+
+	next, cmd := m.Update(statusMsg{text: "Transparent background."})
+	m = next.(Model)
+	if !strings.Contains(m.View(), "Transparent background.") {
+		t.Fatal("the status message never reached the footer")
+	}
+	if cmd == nil {
+		t.Fatal("a status message must schedule its own expiry")
+	}
+
+	next, _ = m.Update(expireStatusMsg{seq: m.statusSeq})
+	m = next.(Model)
+	view := m.View()
+	if strings.Contains(view, "Transparent background.") {
+		t.Error("the status message stayed in the footer after expiring")
+	}
+	if !strings.Contains(view, "quit") {
+		t.Error("the key hints did not come back once the status was gone")
+	}
+}
+
+// Errors take the same line, so they must expire too.
+func TestAnErrorStatusExpiresAsWell(t *testing.T) {
+	withColor(t)
+	m := testModel()
+
+	next, cmd := m.Update(statusMsg{err: errors.New("no job selected")})
+	m = next.(Model)
+	if cmd == nil {
+		t.Fatal("an error status must schedule its own expiry")
+	}
+
+	next, _ = m.Update(expireStatusMsg{seq: m.statusSeq})
+	m = next.(Model)
+	if m.status != "" {
+		t.Errorf("the error stayed in the footer: status = %q", m.status)
+	}
+}
+
+// Two messages in quick succession leave two expiries in flight. The first must
+// not wipe the second.
+func TestALateExpiryDoesNotWipeANewerStatus(t *testing.T) {
+	m := testModel()
+
+	next, _ := m.Update(statusMsg{text: "first"})
+	m = next.(Model)
+	stale := m.statusSeq
+
+	next, _ = m.Update(statusMsg{text: "second"})
+	m = next.(Model)
+
+	next, _ = m.Update(expireStatusMsg{seq: stale})
+	m = next.(Model)
+	if m.status != "second" {
+		t.Errorf("a late expiry wiped a newer message: status = %q", m.status)
 	}
 }

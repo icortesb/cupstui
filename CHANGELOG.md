@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.5 — 2026-08-20
+
+- A message in the footer — "… set as default.", "Transparent background." —
+  now leaves after a few seconds instead of staying for the rest of the
+  session. The footer is one line, shared with the key hints, so a message that
+  never left took the shortcuts with it. Errors are given longer to be read,
+  then go the same way.
+
 ## v0.1.4 — 2026-08-20
 
 - The driver advisory now recognises about 3,400 models — every one gutenprint

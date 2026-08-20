@@ -27,6 +27,13 @@ const refreshInterval = 3 * time.Second
 // requestTimeout keeps a stalled CUPS from freezing the refresh forever.
 const requestTimeout = 5 * time.Second
 
+// The footer message shares its line with the key hints, so it has to give the
+// line back. Errors linger longer because they are worth reading twice.
+const (
+	statusTTL    = 4 * time.Second
+	statusErrTTL = 10 * time.Second
+)
+
 type tab int
 
 const (
@@ -55,6 +62,11 @@ type (
 	statusMsg struct {
 		text string
 		err  error
+	}
+	// expireStatusMsg retires the footer message it was scheduled for. The
+	// sequence number keeps a late expiry from wiping a newer message.
+	expireStatusMsg struct {
+		seq int
 	}
 	checkMsg struct {
 		result cups.CheckResult
@@ -117,6 +129,7 @@ type Model struct {
 	helpVP      viewport.Model
 	status      string
 	statusIsErr bool
+	statusSeq   int
 	showHelp    bool
 
 	width, height int
@@ -222,22 +235,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case actionMsg:
 		m.refreshing = true
 		if msg.err != nil {
-			m.setStatus(describeError(msg.err), true)
+			cmd := m.setStatus(describeError(msg.err), true)
 			// A remote server refusing means credentials, not group
 			// membership: offer the prompt instead of a dead end.
-			if cmd := m.offerSignIn(msg.err); cmd != nil {
-				return m, cmd
+			if signIn := m.offerSignIn(msg.err); signIn != nil {
+				return m, tea.Batch(cmd, signIn)
 			}
-		} else {
-			m.setStatus(msg.text, false)
+			return m, tea.Batch(cmd, m.refresh())
 		}
-		return m, m.refresh()
+		return m, tea.Batch(m.setStatus(msg.text, false), m.refresh())
 
 	case statusMsg:
 		if msg.err != nil {
-			m.setStatus(describeError(msg.err), true)
-		} else {
-			m.setStatus(msg.text, false)
+			return m, m.setStatus(describeError(msg.err), true)
+		}
+		return m, m.setStatus(msg.text, false)
+
+	case expireStatusMsg:
+		if msg.seq == m.statusSeq {
+			m.clearStatus()
 		}
 		return m, nil
 
@@ -307,12 +323,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "y", "s":
 			run := m.confirm.run
 			m.confirm = nil
-			m.status = ""
+			m.clearStatus()
 			return m, func() tea.Msg { return run() }
 		case "n", "esc", "q", "ctrl+c":
 			m.confirm = nil
-			m.setStatus("Cancelled.", false)
-			return m, nil
+			return m, m.setStatus("Cancelled.", false)
 		}
 		return m, nil
 	}
@@ -436,8 +451,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.SignIn):
 		if m.client == nil || m.client.Server().Local {
-			m.setStatus("The local CUPS authenticates by connection, no password needed.", true)
-			return m, nil
+			return m, m.setStatus("The local CUPS authenticates by connection, no password needed.", true)
 		}
 		return m, m.password.start(m.client.Server().String(), m.client.Server().Encrypted())
 
@@ -466,12 +480,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Refresh):
-		m.setStatus("Refreshing…", false)
+		cmd := m.setStatus("Refreshing…", false)
 		if m.refreshing {
-			return m, nil
+			return m, cmd
 		}
 		m.refreshing = true
-		return m, m.refresh()
+		return m, tea.Batch(cmd, m.refresh())
 
 	case key.Matches(msg, keys.Tab1):
 		m.tab = tabDashboard
@@ -530,8 +544,7 @@ func (m Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Export):
 		if len(m.history.visible) == 0 {
-			m.setStatus("Nothing to export.", true)
-			return m, nil
+			return m, m.setStatus("Nothing to export.", true)
 		}
 		return m, exportHistory(m.history.visible)
 	}
@@ -612,8 +625,7 @@ var formKeys = map[string]bool{
 func (m Model) submitPrint() (tea.Model, tea.Cmd) {
 	path := m.print.file()
 	if path == "" {
-		m.setStatus("Select a file first — ctrl+o to browse.", true)
-		return m, nil
+		return m, m.setStatus("Select a file first — ctrl+o to browse.", true)
 	}
 
 	opts := m.print.options(m.snap.Printers)
@@ -658,8 +670,7 @@ func (m Model) handleQueueKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Cancel):
 		job, ok := m.queue.selected()
 		if !ok {
-			m.setStatus("No job selected.", true)
-			return m, nil
+			return m, m.setStatus("No job selected.", true)
 		}
 		c := m.client
 		m.confirm = &confirmation{
@@ -673,8 +684,7 @@ func (m Model) handleQueueKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.HoldJob):
 		job, ok := m.queue.selected()
 		if !ok {
-			m.setStatus("No job selected.", true)
-			return m, nil
+			return m, m.setStatus("No job selected.", true)
 		}
 		c := m.client
 		if job.State == cups.JobHeld {
@@ -688,8 +698,7 @@ func (m Model) handleQueueKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.CancelAll):
 		if len(m.snap.Jobs) == 0 {
-			m.setStatus("The queue is already empty.", true)
-			return m, nil
+			return m, m.setStatus("The queue is already empty.", true)
 		}
 		c := m.client
 		n := len(m.snap.Jobs)
@@ -782,9 +791,26 @@ func (m Model) handlePrintersKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) setStatus(text string, isErr bool) {
+// setStatus puts a message in the footer and hands back the command that takes
+// it away again; without running that command the key hints never return.
+func (m *Model) setStatus(text string, isErr bool) tea.Cmd {
 	m.status = text
 	m.statusIsErr = isErr
+	m.statusSeq++
+	if text == "" {
+		return nil
+	}
+	ttl, seq := statusTTL, m.statusSeq
+	if isErr {
+		ttl = statusErrTTL
+	}
+	return tea.Tick(ttl, func(time.Time) tea.Msg { return expireStatusMsg{seq: seq} })
+}
+
+func (m *Model) clearStatus() {
+	m.status = ""
+	m.statusIsErr = false
+	m.statusSeq++
 }
 
 // describeError builds what the user sees: the actionable hint when the cups
