@@ -35,11 +35,14 @@ CUPS reports.
 
 ## Install
 
+Download a binary from the [releases](https://github.com/icortesb/cupstui/releases),
+or:
+
 ```sh
 go install github.com/icortesb/cupstui/cmd/cupstui@latest
 ```
 
-Or build it:
+From source:
 
 ```sh
 git clone https://github.com/icortesb/cupstui
@@ -47,7 +50,7 @@ cd cupstui
 make build
 ```
 
-The result is a static binary with no shared library dependencies.
+Every route produces a static binary with no shared library dependencies.
 
 ## Requirements
 
@@ -149,6 +152,10 @@ library builds a fresh transport per request and never closes it, which leaks a
 socket per query until the collector gets to it; refreshing every few seconds
 that exhausts the `MaxClients` of cupsd and stalls printing for every program on
 the machine, not just this one.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 

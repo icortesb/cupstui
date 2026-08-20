@@ -13,12 +13,21 @@ import (
 	"github.com/icortesb/cupstui/internal/ui"
 )
 
+// version is set at build time by the release pipeline.
+var version = "dev"
+
 func main() {
 	transparent := flag.Bool("transparent", false,
 		"do not paint a background; let the terminal show through")
 	check := flag.Bool("check", false,
 		"report what this machine can and cannot do, then continue")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("cupstui", version)
+		return
+	}
 
 	// The saved preference wins unless the flag is given explicitly. The T key
 	// changes it and saves it during the session.

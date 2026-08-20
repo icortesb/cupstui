@@ -1,0 +1,37 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/cupstui
+    binary: cupstui
+    # Static, so one binary runs on any Linux with no library to match.
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos: [linux]
+    goarch: [amd64, arm64, arm]
+    goarm: ["7"]
+
+archives:
+  - formats: [tar.gz]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  footer: |
+    Built for Linux. CUPS is the only requirement.
