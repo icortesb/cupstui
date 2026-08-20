@@ -34,6 +34,7 @@ func testModel() Model {
 	m.add.setSize(m.width, 10)
 	m.history.setSize(m.width, 10)
 	m.policy.setSize(m.width)
+	m.preflight.setSize(m.width)
 	return m
 }
 
@@ -101,6 +102,21 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 		{"history sin permisos", func(m *Model) {
 			m.tab = tabHistory
 			m.history.setEntries(nil, &cups.Error{Kind: cups.KindForbidden, Hint: "denied"})
+		}},
+		{"startup checks running", func(m *Model) {
+			m.preflight.active = true
+		}},
+		{"startup checks done", func(m *Model) {
+			m.preflight.active = true
+			for _, r := range []cups.CheckResult{
+				{Name: "CUPS service", Status: cups.CheckOK, Detail: "running"},
+				{Name: "Printing tools", Status: cups.CheckOK, Detail: "available"},
+				{Name: "Administrative access", Status: cups.CheckWarn, Detail: "denied",
+					Hint: "a long remediation note that has to wrap onto more than one line to be readable"},
+				{Name: "Printer drivers", Status: cups.CheckFail, Detail: "none"},
+			} {
+				m.preflight.results[r.Name] = r
+			}
 		}},
 		{"quotas", func(m *Model) {
 			m.policy.start(m.snap.Printers[0])

@@ -56,6 +56,10 @@ type (
 		text string
 		err  error
 	}
+	checkMsg struct {
+		result cups.CheckResult
+		source chan cups.CheckResult
+	}
 	historyMsg struct {
 		entries []cups.HistoryEntry
 		err     error
@@ -94,13 +98,14 @@ type Model struct {
 	// una consulta que tarda más que el intervalo dispara otra encima.
 	refreshing bool
 
-	queue    queueModel
-	printers printersModel
-	print    printModel
-	history  historyModel
-	logs     logsModel
-	add      addModel
-	policy   policyModel
+	queue     queueModel
+	printers  printersModel
+	print     printModel
+	history   historyModel
+	logs      logsModel
+	add       addModel
+	policy    policyModel
+	preflight preflightModel
 
 	confirm     *confirmation
 	helpVP      viewport.Model
@@ -114,21 +119,32 @@ type Model struct {
 // New arma el modelo raíz con un cliente ya conectado.
 func New(c *cups.Client) Model {
 	return Model{
-		client:  c,
-		queue:   newQueue(),
-		print:   newPrint(),
-		history: newHistory(),
-		logs:    newLogs(),
-		add:     newAdd(),
-		policy:  newPolicy(),
-		helpVP:  viewport.New(80, 10),
-		width:   80,
-		height:  24,
+		client:    c,
+		queue:     newQueue(),
+		print:     newPrint(),
+		history:   newHistory(),
+		logs:      newLogs(),
+		add:       newAdd(),
+		policy:    newPolicy(),
+		preflight: newPreflight(),
+		helpVP:    viewport.New(80, 10),
+		width:     80,
+		height:    24,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.refresh(), tickCmd())
+	cmds := []tea.Cmd{m.refresh(), tickCmd()}
+	if m.preflight.active {
+		cmds = append(cmds, m.preflight.start(m.client))
+	}
+	return tea.Batch(cmds...)
+}
+
+// ShowPreflight makes the startup checks run before the interface is entered.
+func (m Model) ShowPreflight() Model {
+	m.preflight.active = true
+	return m
 }
 
 func tickCmd() tea.Cmd {
@@ -220,7 +236,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logs.setLines(msg.lines, msg.err)
 		return m, nil
 
+	case checkMsg:
+		return m, m.preflight.record(msg)
+
 	case spinner.TickMsg:
+		if m.preflight.active && !m.preflight.done() {
+			var cmd tea.Cmd
+			m.preflight.spin, cmd = m.preflight.spin.Update(msg)
+			return m, cmd
+		}
 		if m.add.active && m.add.loading {
 			var cmd tea.Cmd
 			m.add.spin, cmd = m.add.spin.Update(msg)
@@ -273,6 +297,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Con un campo de texto enfocado, o el buscador de archivos abierto, las
 	// teclas son del formulario: si no, los atajos globales (1..5, r, q, /)
 	// se comerían las letras de lo que se está escribiendo.
+	// The startup screen takes every key until it is dismissed.
+	if m.preflight.active {
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "enter", "esc", " ":
+			m.preflight.dismiss()
+			return m, rememberSeen()
+		}
+		return m, nil
+	}
+
 	// El asistente de alta se queda con todas las teclas: tiene campos de texto
 	// y una lista propia.
 	if m.add.active {
@@ -718,9 +754,26 @@ func (m *Model) resize() {
 	m.history.setSize(m.width, body-2)
 	m.add.setSize(m.width, body)
 	m.policy.setSize(m.width)
+	m.preflight.setSize(m.width)
 	m.helpVP.Width = m.width
 	m.helpVP.Height = body
 	m.helpVP.SetContent(helpView(m.width))
+}
+
+// rememberSeen records that the startup checks have been shown, so they do not
+// greet a returning user on every start.
+func rememberSeen() tea.Cmd {
+	return func() tea.Msg {
+		c := config.Load()
+		if c.Seen {
+			return nil
+		}
+		c.Seen = true
+		if err := config.Save(c); err != nil {
+			return statusMsg{err: err}
+		}
+		return nil
+	}
 }
 
 // rememberTransparency guarda la preferencia para la próxima sesión.
@@ -730,7 +783,9 @@ func rememberTransparency(on bool) tea.Cmd {
 		if on {
 			text = "Transparent background."
 		}
-		if err := config.Save(config.Config{Transparent: on}); err != nil {
+		c := config.Load()
+		c.Transparent = on
+		if err := config.Save(c); err != nil {
 			return statusMsg{err: fmt.Errorf("could not save preference: %w", err)}
 		}
 		return statusMsg{text: text}
@@ -762,6 +817,12 @@ func (m Model) bodyHeight() int {
 }
 
 func (m Model) View() string {
+	// The startup screen replaces the interface rather than overlaying it:
+	// until the checks answer, there is nothing trustworthy to show behind.
+	if m.preflight.active {
+		return paintBackground(m.preflight.view(), m.width)
+	}
+
 	var b strings.Builder
 	b.WriteString(m.headerView())
 	b.WriteString("\n")

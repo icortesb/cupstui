@@ -12,6 +12,8 @@ import (
 type Config struct {
 	// Transparent deja ver el fondo del terminal en vez de pintar el propio.
 	Transparent bool `json:"transparent"`
+	// Seen records that the startup checks have already been shown once.
+	Seen bool `json:"seen"`
 }
 
 // Path es dónde vive el archivo, respetando XDG_CONFIG_HOME.

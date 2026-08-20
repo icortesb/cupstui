@@ -16,11 +16,14 @@ import (
 func main() {
 	transparent := flag.Bool("transparent", false,
 		"do not paint a background; let the terminal show through")
+	check := flag.Bool("check", false,
+		"report what this machine can and cannot do, then continue")
 	flag.Parse()
 
 	// La preferencia guardada manda, salvo que se pase el flag explícitamente.
 	// La tecla T la cambia y la guarda durante la sesión.
-	setting := config.Load().Transparent
+	saved := config.Load()
+	setting := saved.Transparent
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "transparent" {
 			setting = *transparent
@@ -37,7 +40,14 @@ func main() {
 	defer client.Close()
 
 	// Sin WithAltScreen la TUI dejaría basura en el scrollback al salir.
-	p := tea.NewProgram(ui.New(client), tea.WithAltScreen())
+	model := ui.New(client)
+	// The checks run on the first start, when nothing is known about the
+	// machine yet, and on request after that.
+	if *check || !saved.Seen {
+		model = model.ShowPreflight()
+	}
+
+	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "cupstui:", err)
 		os.Exit(1)

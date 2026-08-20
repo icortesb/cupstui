@@ -398,7 +398,7 @@ func (a addModel) driverView() string {
 	}
 
 	if len(a.matches) == 0 {
-		b.WriteString("\n" + styleDim.Render("  No driver matches. Try fewer words, or continue without one."))
+		b.WriteString("\n  " + styleWarnText.Render(wrapText(cups.DriverHint(a.ppdFilter.Value()), a.width-6)))
 	}
 	return b.String()
 }
