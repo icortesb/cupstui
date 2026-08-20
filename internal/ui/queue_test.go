@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/icortesb/cupstui/internal/cups"
 )
@@ -63,4 +66,36 @@ func TestMiniBarKeepsItsWidth(t *testing.T) {
 			t.Errorf("miniBar(%v) is %d cells wide, want 5", f, got)
 		}
 	}
+}
+
+func TestTheCursorRowStartsWhereTheOtherRowsDo(t *testing.T) {
+	withColor(t)
+
+	q := newQueue()
+	q.setSize(120, 4)
+	q.setJobs([]cups.Job{
+		{ID: 7, User: "ana", Name: "annual report.pdf", Printer: "Office_Laser", State: cups.JobHeld},
+		{ID: 8, User: "ana", Name: "invoice.pdf", Printer: "Office_Laser", State: cups.JobHeld},
+	})
+
+	cursor := columnStart(t, q.table.View(), "annual report.pdf")
+	below := columnStart(t, q.table.View(), "invoice.pdf")
+	if cursor != below {
+		t.Errorf("the document column starts at %d on the cursor row and at %d on the row below", cursor, below)
+	}
+}
+
+var ansiSequence = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func columnStart(t *testing.T, view, text string) int {
+	t.Helper()
+
+	for _, line := range strings.Split(view, "\n") {
+		plain := ansiSequence.ReplaceAllString(line, "")
+		if i := strings.Index(plain, text); i >= 0 {
+			return lipgloss.Width(plain[:i])
+		}
+	}
+	t.Fatalf("%q was not rendered in any line", text)
+	return 0
 }

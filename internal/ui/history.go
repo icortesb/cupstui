@@ -52,11 +52,7 @@ func (h *historyModel) restyle() {
 		Foreground(colorMuted).
 		Padding(0, 1)
 	s.Cell = base().Foreground(colorText).Padding(0, 1)
-	s.Selected = base().
-		Foreground(lipgloss.Color("232")).
-		Background(colorAccent).
-		Bold(true).
-		Padding(0, 1)
+	s.Selected = base().Foreground(colorAccent).Bold(true)
 	if !transparent {
 		s.Header = s.Header.BorderBackground(colorBG)
 	}
@@ -68,12 +64,13 @@ func (h *historyModel) restyle() {
 }
 
 func historyColumns(width int) []table.Column {
-	const fixed = 17 + 12 + 18 + 7
+	const fixed = 1 + 17 + 12 + 18 + 7
 	doc := width - fixed - 12
 	if doc < 10 {
 		doc = 10
 	}
 	return []table.Column{
+		{Title: " ", Width: 1},
 		{Title: "WHEN", Width: 17},
 		{Title: "USER", Width: 12},
 		{Title: "PRINTER", Width: 18},
@@ -109,6 +106,7 @@ func (h *historyModel) apply() {
 			document = "(untitled)"
 		}
 		rows = append(rows, table.Row{
+			" ",
 			e.When.Format("2006-01-02 15:04"),
 			e.User,
 			e.Printer,
@@ -126,6 +124,18 @@ func (h *historyModel) apply() {
 		cursor = 0
 	}
 	h.table.SetCursor(cursor)
+	h.markCursor()
+}
+
+func (h *historyModel) markCursor() {
+	rows := h.table.Rows()
+	for i := range rows {
+		rows[i][0] = " "
+	}
+	if c := h.table.Cursor(); c >= 0 && c < len(rows) {
+		rows[c][0] = "▌"
+	}
+	h.table.SetRows(rows)
 }
 
 func (h *historyModel) startFiltering() tea.Cmd {

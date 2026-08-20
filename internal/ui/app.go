@@ -513,6 +513,7 @@ func (m Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.history.table, cmd = m.history.table.Update(msg)
+	m.history.markCursor()
 	return m, cmd
 }
 
@@ -678,6 +679,7 @@ func (m Model) handleQueueKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.queue.table, cmd = m.queue.table.Update(msg)
+	m.queue.markCursor()
 	return m, cmd
 }
 

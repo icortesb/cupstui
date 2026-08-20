@@ -18,7 +18,7 @@ type queueModel struct {
 	table     table.Model
 	filter    textinput.Model
 	filtering bool
-	visible   []cups.Job // trabajos que se ven, alineados con las filas de la tabla
+	visible   []cups.Job // aligned with the table rows
 	width     int
 }
 
@@ -49,11 +49,7 @@ func (q *queueModel) restyle() {
 		Foreground(colorMuted).
 		Padding(0, 1)
 	s.Cell = base().Foreground(colorText).Padding(0, 1)
-	s.Selected = base().
-		Foreground(lipgloss.Color("232")).
-		Background(colorAccent).
-		Bold(true).
-		Padding(0, 1)
+	s.Selected = base().Foreground(colorAccent).Bold(true)
 	if !transparent {
 		s.Header = s.Header.BorderBackground(colorBG)
 	}
@@ -67,12 +63,13 @@ func (q *queueModel) restyle() {
 // queueColumns shares out the available width, leaving the document name
 // whatever is left over.
 func queueColumns(width int) []table.Column {
-	const fixed = 6 + 12 + 18 + 13 + 7 // id, usuario, impresora, estado, when
-	doc := width - fixed - 14          // 14 = padding de las celdas
+	const fixed = 1 + 6 + 12 + 18 + 13 + 7
+	doc := width - fixed - 14
 	if doc < 10 {
 		doc = 10
 	}
 	return []table.Column{
+		{Title: " ", Width: 1},
 		{Title: "ID", Width: 6},
 		{Title: "USER", Width: 12},
 		{Title: "DOCUMENT", Width: doc},
@@ -108,7 +105,7 @@ func (q *queueModel) setJobs(jobs []cups.Job) {
 			name = "(untitled)"
 		}
 		rows = append(rows, table.Row{
-			strconv.Itoa(j.ID), j.User, name, j.Printer, jobState(j), when,
+			" ", strconv.Itoa(j.ID), j.User, name, j.Printer, jobState(j), when,
 		})
 	}
 
@@ -121,6 +118,21 @@ func (q *queueModel) setJobs(jobs []cups.Job) {
 		cursor = 0
 	}
 	q.table.SetCursor(cursor)
+	q.markCursor()
+}
+
+// markCursor moves the cursor bar. It needs a column of its own because bubbles
+// applies the Selected style outside the cells, where a padding shifts the row
+// out of line with the header and a background never reaches the text.
+func (q *queueModel) markCursor() {
+	rows := q.table.Rows()
+	for i := range rows {
+		rows[i][0] = " "
+	}
+	if c := q.table.Cursor(); c >= 0 && c < len(rows) {
+		rows[c][0] = "▌"
+	}
+	q.table.SetRows(rows)
 }
 
 // jobState is the state cell: a printing job shows how far along it is, which
