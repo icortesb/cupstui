@@ -661,6 +661,10 @@ func (m Model) handleLogsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.logs.nextFile()
 		return m, readLog(m.logs.current())
 	}
+	if key.Matches(msg, keys.LogLevel) {
+		m.logs.cycleLevel()
+		return m, nil
+	}
 	return m, m.logs.update(msg)
 }
 

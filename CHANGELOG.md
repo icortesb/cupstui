@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- The Logs tab folds a run of the same message into one line with a count.
+  cupsd writes "Local authentication certificate not found." once per client
+  connection, so a screen of the log was eighty-five copies of it and the one
+  line that mattered — an internal error adding a printer — was somewhere
+  above the top of the screen. Neighbouring repeats now collapse, which on a
+  real `error_log` turned 150 lines into 29. Nothing is dropped: the count
+  says how many there were, and only lines next to each other fold, so the
+  order of events survives.
+- `v` on the Logs tab sets a minimum level, cycling through all, info,
+  warnings and errors. It is what makes `LogLevel debug` readable, and the
+  header says which floor is in force. Lines cupsd stamps with no level at
+  all — every line of `access_log` and `page_log` — are never hidden by it.
+- The level letter and the timestamp are dimmed. They are the same thirty
+  characters at the start of every line, and colouring them along with the
+  message left a wall of red in which nothing stood out.
+
 ## v0.1.11 — 2026-08-20
 
 - A narrow terminal keeps its navigation. The header and the row of key hints

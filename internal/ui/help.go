@@ -25,7 +25,7 @@ func helpView(width int) string {
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "print")),
 		}},
 		{"History", []key.Binding{keys.Summary, keys.Filter, keys.Export}},
-		{"Logs", []key.Binding{keys.NextLog}},
+		{"Logs", []key.Binding{keys.NextLog, keys.LogLevel}},
 		{"General", []key.Binding{keys.Refresh, keys.Transparent, keys.SignIn, keys.Escape, keys.Help, keys.Quit}},
 	}
 
@@ -93,7 +93,7 @@ func shortHelp(t tab, filtering bool) string {
 	case tabHistory:
 		return hint("s", "totals") + " · " + hint("j/k", "move") + " · " + hint("/", "filter") + " · " + hint("E", "export CSV") + " · " + common
 	case tabLogs:
-		return hint("j/k", "scroll") + " · " + hint("G", "jump to end") + " · " + hint("n", "next log") + " · " + common
+		return hint("j/k", "scroll") + " · " + hint("G", "jump to end") + " · " + hint("n", "next log") + " · " + hint("v", "level") + " · " + common
 	case tabPrinters:
 		return hint("j/k", "move") + " · " + hint("e", "enable") + " · " + hint("d", "default") + " · " + hint("a", "accept") + " · " + hint("A", "add") + " · " + hint("x", "remove") + " · " + hint("u", "quotas") + " · " + hint("i", "diagnose") + " · " + common
 	default:

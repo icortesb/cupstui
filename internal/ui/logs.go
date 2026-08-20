@@ -22,6 +22,9 @@ type logsModel struct {
 	// follow keeps the view pinned to the end; it turns off when scrolling up
 	// so a line can be read without the refresh dragging the screen away.
 	follow bool
+	// min hides anything cupsd stamped below it. At SeverityNone nothing is
+	// hidden, which is where it starts: the log says what it says.
+	min cups.Severity
 }
 
 func newLogs() logsModel {
@@ -48,13 +51,60 @@ func (l *logsModel) nextFile() {
 	l.render()
 }
 
+// levels are what cycleLevel walks through, quietest last.
+var levels = []cups.Severity{cups.SeverityNone, cups.SeverityInfo, cups.SeverityWarning, cups.SeverityError}
+
+func (l *logsModel) cycleLevel() {
+	for i, s := range levels {
+		if s == l.min {
+			l.min = levels[(i+1)%len(levels)]
+			l.render()
+			return
+		}
+	}
+	l.min = cups.SeverityNone
+	l.render()
+}
+
+// atLeast drops the lines below min. A line cupsd stamped with no level at all
+// — every line of access_log and page_log — has nothing to compare and stays,
+// so the filter only ever thins the log it was meant for.
+func atLeast(lines []string, min cups.Severity) []string {
+	if min == cups.SeverityNone {
+		return lines
+	}
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if s := cups.LineSeverity(line); s == cups.SeverityNone || s >= min {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+// levelName is how the header names the current floor.
+func levelName(s cups.Severity) string {
+	switch s {
+	case cups.SeverityInfo:
+		return "info+"
+	case cups.SeverityWarning:
+		return "warnings+"
+	case cups.SeverityError:
+		return "errors"
+	default:
+		return "all"
+	}
+}
+
 func (l *logsModel) setLines(lines []string, err error) {
 	l.lines, l.err = lines, err
 	l.render()
 }
 
 func (l *logsModel) render() {
-	body := strings.Join(colourise(l.lines), "\n")
+	// Filter first, then collapse: hiding the chatter in between often leaves
+	// two identical lines next to each other that are worth folding.
+	body := strings.Join(colourise(cups.Collapse(atLeast(l.lines, l.min))), "\n")
 	if l.err != nil {
 		body = ""
 	}
@@ -80,6 +130,9 @@ func (l logsModel) view(width int) string {
 	if l.follow {
 		state = styleOKText.Render("following")
 	}
+	if l.min != cups.SeverityNone {
+		state = styleWarnText.Render(levelName(l.min)) + "  " + state
+	}
 	gap := width - lipgloss.Width(title) - lipgloss.Width(state) - 2
 	if gap < 1 {
 		gap = 1
@@ -96,6 +149,10 @@ func (l logsModel) view(width int) string {
 	if len(l.lines) == 0 {
 		return header + "\n\n" + styleDim.Render("  The log is empty.")
 	}
+	if len(atLeast(l.lines, l.min)) == 0 {
+		return header + "\n\n" + styleDim.Render(
+			"  Nothing at "+levelName(l.min)+" — press v for the rest.")
+	}
 	return header + "\n" + l.vp.View()
 }
 
@@ -104,18 +161,21 @@ func (l logsModel) view(width int) string {
 func colourise(lines []string) []string {
 	out := make([]string, len(lines))
 	for i, line := range lines {
+		var style lipgloss.Style
 		switch cups.LineSeverity(line) {
 		case cups.SeverityError:
-			out[i] = styleErrText.Render(line)
+			style = styleErrText
 		case cups.SeverityWarning:
-			out[i] = styleWarnText.Render(line)
-		case cups.SeverityInfo:
-			out[i] = styleValue.Render(line)
+			style = styleWarnText
 		case cups.SeverityDebug:
-			out[i] = styleDim.Render(line)
+			style = styleDim
 		default:
-			out[i] = styleValue.Render(line)
+			style = styleValue
 		}
+		// The level letter and timestamp are the same thirty characters on
+		// every line; keeping them dim leaves the colour to mean the message.
+		prefix, msg := cups.SplitLogLine(line)
+		out[i] = styleDim.Render(prefix) + style.Render(msg)
 	}
 	return out
 }

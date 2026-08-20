@@ -106,3 +106,79 @@ func TestLogFilesNamesTheUsualCUPSLogs(t *testing.T) {
 		}
 	}
 }
+
+func TestCollapseFoldsARunOfTheSameMessage(t *testing.T) {
+	lines := []string{
+		"E [19/Aug/2026:22:05:28 -0300] [Client 290] Local authentication certificate not found.",
+		"E [19/Aug/2026:22:05:28 -0300] [Client 291] Local authentication certificate not found.",
+		"E [19/Aug/2026:22:05:28 -0300] [Client 292] Local authentication certificate not found.",
+		"W [19/Aug/2026:22:37:52 -0300] CreateProfile failed",
+	}
+
+	got := Collapse(lines)
+	if len(got) != 2 {
+		t.Fatalf("Collapse = %v, want 2 lines", got)
+	}
+	// The client tag is what varies, so it goes; the count replaces it.
+	if strings.Contains(got[0], "Client") {
+		t.Errorf("kept a client tag that misreports the rest: %q", got[0])
+	}
+	if !strings.Contains(got[0], "(×3)") {
+		t.Errorf("Collapse[0] = %q, want a count of 3", got[0])
+	}
+	if got[1] != lines[3] {
+		t.Errorf("Collapse[1] = %q, want it untouched", got[1])
+	}
+}
+
+func TestCollapseKeepsTheLineWhenOneClientRepeatsItself(t *testing.T) {
+	lines := []string{
+		"E [19/Aug/2026:22:05:28 -0300] [Client 5] Local authentication certificate not found.",
+		"E [19/Aug/2026:22:05:29 -0300] [Client 5] Local authentication certificate not found.",
+	}
+
+	got := Collapse(lines)
+	if len(got) != 1 {
+		t.Fatalf("Collapse = %v, want 1 line", got)
+	}
+	if !strings.Contains(got[0], "[Client 5]") || !strings.Contains(got[0], "(×2)") {
+		t.Errorf("Collapse = %q, want the client kept and a count of 2", got[0])
+	}
+}
+
+func TestCollapseOnlyFoldsNeighbours(t *testing.T) {
+	lines := []string{
+		"E [19/Aug/2026:22:05:28 -0300] [Client 1] same",
+		"W [19/Aug/2026:22:05:29 -0300] something else",
+		"E [19/Aug/2026:22:05:30 -0300] [Client 2] same",
+	}
+
+	if got := Collapse(lines); len(got) != 3 {
+		t.Errorf("Collapse = %v, want the order of events kept", got)
+	}
+}
+
+func TestCollapseLeavesLinesWithoutALevelAlone(t *testing.T) {
+	lines := []string{
+		`localhost - - [19/Aug/2026:22:05:28 -0300] "POST / HTTP/1.1" 200 362`,
+		`localhost - - [19/Aug/2026:22:05:29 -0300] "POST / HTTP/1.1" 200 362`,
+	}
+
+	if got := Collapse(lines); len(got) != 2 {
+		t.Errorf("Collapse = %v, want access_log lines untouched", got)
+	}
+}
+
+func TestSplitLogLineSeparatesTheTimestampFromTheMessage(t *testing.T) {
+	prefix, msg := SplitLogLine("E [19/Aug/2026:22:05:28 -0300] [Client 290] Not found.")
+	if prefix != "E [19/Aug/2026:22:05:28 -0300] " {
+		t.Errorf("prefix = %q", prefix)
+	}
+	if msg != "[Client 290] Not found." {
+		t.Errorf("msg = %q", msg)
+	}
+
+	if prefix, msg := SplitLogLine("no level here"); prefix != "" || msg != "no level here" {
+		t.Errorf("SplitLogLine = %q, %q, want it all message", prefix, msg)
+	}
+}

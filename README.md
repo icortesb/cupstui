@@ -125,7 +125,7 @@ jobs, `A` add, `x` remove, `u` quotas and access, `i` diagnose.
 
 **History** — `s` totals, `E` export CSV.
 
-**Logs** — `n` next log, `G` jump to the end.
+**Logs** — `n` next log, `v` minimum level, `G` jump to the end.
 
 ## Filtering
 
