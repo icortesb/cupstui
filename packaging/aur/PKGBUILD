@@ -1,6 +1,6 @@
 # Maintainer: icortesb <https://github.com/icortesb>
 pkgname=cupstui
-pkgver=0.1.7
+pkgver=0.1.10
 pkgrel=1
 pkgdesc="Terminal interface for CUPS: queue, printers, printing, quotas, history and logs"
 arch=('x86_64' 'aarch64')
@@ -9,7 +9,7 @@ license=('MIT')
 depends=('cups')
 makedepends=('go')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('c65ce6abbfca47f7c5b8d4494d88c600b83cf1681f5c058be357dff6593bdcd9')
+sha256sums=('94596b4ee8f1116fd2115b160f7542feb6c28b18363b4324973900a35834c465')
 
 build() {
   cd "$pkgname-$pkgver"

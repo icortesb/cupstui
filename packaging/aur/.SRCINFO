@@ -1,6 +1,6 @@
 pkgbase = cupstui
 	pkgdesc = Terminal interface for CUPS: queue, printers, printing, quotas, history and logs
-	pkgver = 0.1.7
+	pkgver = 0.1.10
 	pkgrel = 1
 	url = https://github.com/icortesb/cupstui
 	arch = x86_64
@@ -8,7 +8,7 @@ pkgbase = cupstui
 	license = MIT
 	makedepends = go
 	depends = cups
-	source = cupstui-0.1.7.tar.gz::https://github.com/icortesb/cupstui/archive/refs/tags/v0.1.7.tar.gz
-	sha256sums = c65ce6abbfca47f7c5b8d4494d88c600b83cf1681f5c058be357dff6593bdcd9
+	source = cupstui-0.1.10.tar.gz::https://github.com/icortesb/cupstui/archive/refs/tags/v0.1.10.tar.gz
+	sha256sums = 94596b4ee8f1116fd2115b160f7542feb6c28b18363b4324973900a35834c465
 
 pkgname = cupstui
