@@ -1,10 +1,10 @@
-// Package cups habla IPP con el demonio local de CUPS.
+// Package cups speaks IPP to the local CUPS daemon.
 //
-// Se usa IPP directo en lugar de shellear lp/lpstat porque la salida de esas
-// herramientas está localizada y es de formato libre, mientras que IPP devuelve
-// atributos tipados. El transporte es el socket unix (/run/cups/cups.sock): por
-// ahí CUPS autentica al usuario local, mientras que el mismo pedido por
-// TCP a localhost:631 responde 401.
+// It uses IPP directly rather than shelling out to lp/lpstat because the output
+// of those tools is localised and free-form, while IPP returns typed
+// attributes. The transport is the unix socket (/run/cups/cups.sock): over it
+// CUPS authenticates the local user, whereas the same request over TCP to
+// localhost:631 answers 401.
 package cups
 
 import (
@@ -17,8 +17,8 @@ import (
 	ipp "github.com/phin1x/go-ipp"
 )
 
-// Client es un cliente de CUPS seguro para la UI: nunca entra en pánico y
-// devuelve siempre errores clasificados.
+// Client is a CUPS client safe for the interface: it never panics and always
+// returns classified errors.
 type Client struct {
 	user    string
 	adapter ipp.Adapter
@@ -26,11 +26,11 @@ type Client struct {
 	ipp     *ipp.IPPClient
 }
 
-// New conecta con el CUPS local por su socket unix.
+// New connects to the local CUPS over its unix socket.
 //
-// Que el socket no exista todavía no es un error: la UI arranca igual, muestra
-// el aviso y se recupera sola cuando el servicio vuelve, así que se apunta al
-// path canónico y se deja fallar cada pedido.
+// A missing socket is not an error: the interface starts anyway, shows the
+// notice and recovers on its own once the service returns, so this points at
+// the canonical path and lets each request fail.
 func New() (*Client, error) {
 	name := "root"
 	if u, err := user.Current(); err == nil {
@@ -46,7 +46,7 @@ func New() (*Client, error) {
 	return c, nil
 }
 
-// Close libera la conexión persistente con cupsd.
+// Close releases the persistent connection to cupsd.
 func (c *Client) Close() {
 	if a, ok := c.adapter.(*socketAdapter); ok {
 		a.close()
@@ -62,9 +62,8 @@ func newWithAdapter(username string, a ipp.Adapter) *Client {
 	}
 }
 
-// Snapshot es una foto completa del estado de CUPS en un instante. La UI se
-// refresca a partir de una sola de estas, así que las vistas nunca se
-// desincronizan entre sí.
+// Snapshot is a complete picture of CUPS at one instant. The interface
+// refreshes from a single one of these, so the views never drift apart.
 type Snapshot struct {
 	Printers []Printer
 	Jobs     []Job
@@ -98,7 +97,7 @@ var jobAttributes = []string{
 	"job-k-octets",
 }
 
-// Snapshot consulta impresoras, cola y default en una sola pasada.
+// Snapshot queries printers, queue and default in one pass.
 func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
 	var snap Snapshot
 
@@ -120,8 +119,8 @@ func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
 	}
 	sortJobs(snap.Jobs)
 
-	// El default es informativo: si falla, no vale la pena tirar abajo toda
-	// la foto.
+	// The default is informational: if it fails, it is not worth discarding the
+	// whole snapshot.
 	if def, err := c.getDefault(ctx); err == nil {
 		snap.Default = def
 		for i := range snap.Printers {
@@ -139,8 +138,8 @@ func (c *Client) getPrinters(ctx context.Context) (printers map[string]ipp.Attri
 
 func (c *Client) getJobs(ctx context.Context) (jobs map[int]ipp.Attributes, err error) {
 	defer func() { err = recovered(recover(), err) }()
-	// whichJobs "not-completed" es la cola real; myJobs=false para ver la de
-	// todos los usuarios.
+	// whichJobs "not-completed" is the live queue; myJobs=false shows every
+	// user's jobs.
 	return c.ipp.GetJobsContext(ctx, "", "", "not-completed", false, 0, 0, jobAttributes)
 }
 
@@ -160,9 +159,9 @@ func (c *Client) getDefault(ctx context.Context) (name string, err error) {
 	return attrString(resp.PrinterAttributes[0], "printer-name"), nil
 }
 
-// recovered convierte un pánico de la librería IPP en un error. go-ipp hace
-// type assertions sin verificar sobre las respuestas del servidor, y un pánico
-// ahí se llevaría puesta la TUI entera.
+// recovered turns a panic from the IPP library into an error. go-ipp type
+// asserts server responses without checking, and a panic there would take the
+// whole interface down.
 func recovered(r interface{}, err error) error {
 	if r == nil {
 		return err
@@ -170,23 +169,23 @@ func recovered(r interface{}, err error) error {
 	return fmt.Errorf("unexpected IPP response: %v", r)
 }
 
-// CancelJob cancela un trabajo por id.
+// CancelJob cancels one job by id.
 func (c *Client) CancelJob(id int) error {
 	return classifyNil(c.ipp.CancelJob(id, false))
 }
 
-// CancelAllJobs cancela todos los trabajos de una impresora; con printer vacío,
-// los de todas.
+// CancelAllJobs cancels every job on a printer; with an empty printer, on all
+// of them.
 func (c *Client) CancelAllJobs(printer string) error {
 	return classifyNil(c.ipp.CancelAllJob(printer, false))
 }
 
-// HoldJob retiene un trabajo: queda en la cola pero no se imprime.
+// HoldJob holds a job: it stays queued but does not print.
 func (c *Client) HoldJob(id int) error {
 	return c.sendJob(ipp.OperationHoldJob, id)
 }
 
-// ReleaseJob libera un trabajo retenido para que vuelva a la cola activa.
+// ReleaseJob returns a held job to the active queue.
 func (c *Client) ReleaseJob(id int) error {
 	return c.sendJob(ipp.OperationReleaseJob, id)
 }
@@ -202,18 +201,17 @@ func (c *Client) sendJob(op int16, id int) (err error) {
 	return err
 }
 
-// EnablePrinter reanuda una impresora detenida (equivale a cupsenable).
+// EnablePrinter resumes a stopped printer, as cupsenable does.
 func (c *Client) EnablePrinter(name string) error {
 	return classifyNil(c.ipp.ResumePrinter(name))
 }
 
-// DisablePrinter detiene una impresora (equivale a cupsdisable). Los trabajos
-// quedan en cola.
+// DisablePrinter stops a printer, as cupsdisable does. Jobs stay queued.
 func (c *Client) DisablePrinter(name string) error {
 	return classifyNil(c.ipp.PausePrinter(name))
 }
 
-// SetAccepting decide si la impresora admite trabajos nuevos.
+// SetAccepting decides whether the printer takes new jobs.
 func (c *Client) SetAccepting(name string, accepting bool) error {
 	op := ipp.OperationCupsRejectJobs
 	if accepting {
@@ -222,7 +220,7 @@ func (c *Client) SetAccepting(name string, accepting bool) error {
 	return c.sendAdmin(op, name)
 }
 
-// SetDefault marca la impresora como destino por omisión del sistema.
+// SetDefault makes the printer the system default destination.
 func (c *Client) SetDefault(name string) error {
 	return c.sendAdmin(ipp.OperationCupsSetDefault, name)
 }

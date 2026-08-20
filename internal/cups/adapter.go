@@ -14,24 +14,24 @@ import (
 	ipp "github.com/phin1x/go-ipp"
 )
 
-// socketAdapter habla IPP con cupsd por su socket unix.
+// socketAdapter speaks IPP to cupsd over its unix socket.
 //
-// Existe en vez de usar ipp.SocketAdapter porque aquel arma un http.Transport
-// nuevo en cada request y nunca lo cierra: la conexión keep-alive queda en el
-// pool de un transport que ya nadie referencia, así que el socket sobrevive
-// hasta que el recolector lo junte. Con un refresco cada pocos segundos eso
-// agota el MaxClients de cupsd (100 por omisión) y deja colgado a todo el
-// sistema de impresión, no solo a esta aplicación.
+// It exists instead of ipp.SocketAdapter because that one builds a fresh
+// http.Transport per request and never closes it: the keep-alive connection
+// stays in the pool of a transport nothing references any more, so the socket
+// survives until the collector gets to it. Refreshing every few seconds that
+// exhausts the MaxClients of cupsd (100 by default) and stalls the whole
+// printing system, not just this application.
 //
-// Acá el transport es uno solo y vive lo que vive el adapter, así que las
-// consultas reusan una única conexión.
+// Here there is one transport, living as long as the adapter, so queries reuse
+// a single connection.
 type socketAdapter struct {
 	socket    string
 	certPaths []string
 	client    *http.Client
 }
 
-// socketSearchPaths cubre las ubicaciones habituales del socket de cupsd.
+// socketSearchPaths covers the usual locations of the cupsd socket.
 var socketSearchPaths = []string{
 	"/run/cups/cups.sock",
 	"/var/run/cups/cups.sock",
@@ -39,9 +39,9 @@ var socketSearchPaths = []string{
 	"/private/var/run/cupsd",
 }
 
-// certSearchPaths es el certificado de autenticación local de CUPS. Suele ser
-// legible solo por root; sin él la autenticación por credenciales del socket
-// alcanza para el usuario local.
+// certSearchPaths holds the CUPS local authentication certificate. It is
+// usually readable by root alone; without it, the socket peer credentials are
+// enough for the local user.
 var certSearchPaths = []string{"/run/cups/certs/0", "/etc/cups/certs/0"}
 
 func newSocketAdapter(socket string) *socketAdapter {
@@ -62,14 +62,14 @@ func newSocketAdapter(socket string) *socketAdapter {
 	}
 }
 
-// close libera la conexión persistente.
+// close releases the persistent connection.
 func (a *socketAdapter) close() {
 	if tr, ok := a.client.Transport.(*http.Transport); ok {
 		tr.CloseIdleConnections()
 	}
 }
 
-// findSocket devuelve el primer path de la lista que sea un socket.
+// findSocket returns the first path in the list that is a socket.
 func findSocket(paths []string) (string, error) {
 	for _, path := range paths {
 		fi, err := os.Stat(path)
@@ -106,9 +106,9 @@ func (a *socketAdapter) SendRequestContext(ctx context.Context, url string, r *i
 	}
 	req.Header.Set("Content-Length", strconv.Itoa(size))
 	req.Header.Set("Content-Type", ipp.ContentTypeIPP)
-	// El certificado local solo lo lee root. Mandar el encabezado vacío hace
-	// que cupsd registre un error por cada pedido; sin encabezado, autentica
-	// por las credenciales del socket unix y no ensucia el error_log.
+	// Only root can read the local certificate. Sending the header empty makes
+	// cupsd log an error for every request; without the header it authenticates
+	// by unix socket credentials and leaves error_log alone.
 	if cert := a.cert(); cert != "" {
 		req.Header.Set("Authorization", "Local "+cert)
 	}
@@ -120,8 +120,8 @@ func (a *socketAdapter) SendRequestContext(ctx context.Context, url string, r *i
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		// Se drena el cuerpo para que la conexión vuelva al pool en lugar de
-		// cerrarse y tener que redialar en el próximo refresco.
+		// Drain the body so the connection returns to the pool instead of
+		// closing and having to redial on the next refresh.
 		io.Copy(io.Discard, resp.Body)
 		return nil, ipp.HTTPError{Code: resp.StatusCode}
 	}
@@ -144,8 +144,8 @@ func (a *socketAdapter) SendRequestContext(ctx context.Context, url string, r *i
 	return ippResp, nil
 }
 
-// cert lee el certificado local si es accesible; si no lo es, se devuelve
-// vacío y CUPS autentica por las credenciales del socket unix.
+// cert reads the local certificate when it is readable; otherwise it returns
+// empty and CUPS authenticates by unix socket credentials.
 func (a *socketAdapter) cert() string {
 	for _, path := range a.certPaths {
 		if b, err := os.ReadFile(path); err == nil {
@@ -155,8 +155,8 @@ func (a *socketAdapter) cert() string {
 	return ""
 }
 
-// GetHttpUri arma las URLs que espera cupsd. El host es irrelevante porque el
-// transporte va por el socket, pero net/http necesita uno válido.
+// GetHttpUri builds the URLs cupsd expects. The host is irrelevant because the
+// transport goes over the socket, but net/http requires a valid one.
 func (a *socketAdapter) GetHttpUri(namespace string, object interface{}) string {
 	uri := "http://localhost"
 	if namespace != "" {

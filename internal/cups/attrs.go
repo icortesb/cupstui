@@ -6,9 +6,9 @@ import (
 	ipp "github.com/phin1x/go-ipp"
 )
 
-// Los valores que devuelve el decodificador IPP son interface{}, así que cada
-// lectura tolera el tipo inesperado y el atributo ausente en vez de entrar en
-// pánico: CUPS omite atributos según versión y driver.
+// The IPP decoder returns interface{} values, so every read tolerates an
+// unexpected type and a missing attribute rather than panicking: CUPS omits
+// attributes depending on version and driver.
 
 func attrValues(a ipp.Attributes, key string) []interface{} {
 	list, ok := a[key]

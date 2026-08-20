@@ -8,8 +8,8 @@ import (
 	ipp "github.com/phin1x/go-ipp"
 )
 
-// Kind clasifica el fallo para que la UI muestre algo accionable en vez del
-// error crudo de la librería.
+// Kind classifies the failure so the interface can show something actionable
+// instead of the raw library error.
 type Kind int
 
 const (
@@ -19,8 +19,8 @@ const (
 	KindNotFound
 )
 
-// Error es el error que expone este paquete: conserva el original y le suma
-// una clasificación y una pista para el usuario.
+// Error is what this package returns: it keeps the original and adds a
+// classification and a hint for the user.
 type Error struct {
 	Kind Kind
 	Hint string
@@ -36,7 +36,7 @@ func (e *Error) Error() string {
 
 func (e *Error) Unwrap() error { return e.Err }
 
-// Códigos de estado IPP relevantes (RFC 8011 §14.1.4).
+// Relevant IPP status codes (RFC 8011 §14.1.4).
 const (
 	ippForbidden        int16 = 0x0401
 	ippNotAuthenticated int16 = 0x0402
