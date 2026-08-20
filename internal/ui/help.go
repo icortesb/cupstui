@@ -25,7 +25,7 @@ func helpView(width int) string {
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "imprimir")),
 		}},
 		{"Logs", []key.Binding{keys.NextLog}},
-		{"General", []key.Binding{keys.Refresh, keys.Escape, keys.Help, keys.Quit}},
+		{"General", []key.Binding{keys.Refresh, keys.Transparent, keys.Escape, keys.Help, keys.Quit}},
 	}
 
 	rendered := make([]string, 0, len(sections))
@@ -88,7 +88,7 @@ func shortHelp(t tab, filtering bool) string {
 	case tabQueue:
 		return hint("j/k", "mover") + " · " + hint("p", "pausar") + " · " + hint("x", "cancelar") + " · " + hint("X", "todos") + " · " + hint("/", "filtrar") + " · " + common
 	case tabPrint:
-		return hint("↑↓", "campo") + " · " + hint("←→", "valor") + " · " + hint("ctrl+o", "buscar") + " · " + hint("enter", "imprimir") + " · " + common
+		return hint("↑↓", "campo") + " · " + hint("←→", "valor") + " · " + hint("ctrl+o", "buscar") + " · " + hint("enter", "imprimir") + " · " + hint("tab", "cambiar de pestaña")
 	case tabLogs:
 		return hint("j/k", "desplazar") + " · " + hint("G", "ir al final") + " · " + hint("n", "otro registro") + " · " + common
 	case tabPrinters:

@@ -187,3 +187,96 @@ func TestEscapeLeavesTheTextFieldSoShortcutsWorkAgain(t *testing.T) {
 		t.Errorf("después de esc, 2 debería ir a la Cola, fui a %v", got)
 	}
 }
+
+// En el formulario de impresión las flechas ←/→ cambian el valor del campo, así
+// que no pueden además cambiar de pestaña. Para que no se quede uno encerrado,
+// tab y shift+tab tienen que cambiar de pestaña siempre, incluso mientras se
+// escribe en un campo de texto.
+func TestTabSwitchesTabsEvenWhileEditingThePrintForm(t *testing.T) {
+	withColor(t)
+	m := testModel()
+	m.tab = tabPrint
+	m.print.focus = fieldFile // un campo de texto
+	m.print.applyFocus()
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if got := next.(Model).tab; got != tabLogs {
+		t.Errorf("tab desde Imprimir fue a %v, quiero tabLogs", got)
+	}
+
+	m.tab = tabPrint
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	if got := next.(Model).tab; got != tabPrinters {
+		t.Errorf("shift+tab desde Imprimir fue a %v, quiero tabPrinters", got)
+	}
+}
+
+func TestArrowsMoveBetweenFormFieldsWhileEditing(t *testing.T) {
+	withColor(t)
+	m := testModel()
+	m.tab = tabPrint
+	m.print.focus = fieldFile
+	m.print.applyFocus()
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = next.(Model)
+	if m.print.focus != fieldPrinter {
+		t.Errorf("↓ dejó el foco en %d, quiero fieldPrinter", m.print.focus)
+	}
+	if m.tab != tabPrint {
+		t.Errorf("↓ cambió de pestaña a %v", m.tab)
+	}
+}
+
+func TestHorizontalArrowsEditTextInsteadOfCyclingValues(t *testing.T) {
+	withColor(t)
+	m := testModel()
+	m.tab = tabPrint
+	m.print.focus = fieldRanges
+	m.print.applyFocus()
+	m.print.ranges.SetValue("12")
+	m.print.ranges.SetCursor(2)
+
+	// ← mueve el cursor dentro del texto; lo que se escriba después entra ahí.
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	m = next.(Model)
+	m = typeInto(m, "9")
+
+	if got := m.print.ranges.Value(); got != "192" {
+		t.Errorf("el campo quedó en %q, quiero \"192\": ← tiene que mover el cursor, no cambiar un valor", got)
+	}
+}
+
+func TestTransparencyCanBeToggledAtRuntime(t *testing.T) {
+	withColor(t)
+	m := testModel()
+
+	painted := backgroundSequence()
+	if painted == "" {
+		t.Fatal("de arranque la aplicación tiene que pintar su fondo")
+	}
+
+	next, _ := m.Update(press("T"))
+	m = next.(Model)
+	if backgroundSequence() != "" {
+		t.Error("después del toggle no se tiene que pintar fondo")
+	}
+	for i, line := range strings.Split(m.View(), "\n") {
+		if strings.HasPrefix(line, painted) {
+			t.Errorf("línea %d sigue pintada en modo transparente", i)
+			break
+		}
+	}
+
+	next, _ = m.Update(press("T"))
+	m = next.(Model)
+	if backgroundSequence() != painted {
+		t.Error("el segundo toggle tiene que devolver el fondo")
+	}
+	for i, line := range strings.Split(m.View(), "\n") {
+		if !strings.HasPrefix(line, painted) {
+			t.Errorf("línea %d quedó sin pintar al volver del modo transparente", i)
+			break
+		}
+	}
+}

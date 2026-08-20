@@ -26,6 +26,19 @@ func newQueue() queueModel {
 		table.WithFocused(true),
 		table.WithColumns(queueColumns(80)),
 	)
+	f := textinput.New()
+	f.Prompt = "/"
+	f.Placeholder = "texto libre, o impresora:epson usuario:ana estado:retenido"
+	f.CharLimit = 80
+
+	q := queueModel{table: t, filter: f}
+	q.restyle()
+	return q
+}
+
+// restyle vuelve a aplicar los estilos, que la tabla y el campo de filtro se
+// guardan por copia al construirse.
+func (q *queueModel) restyle() {
 	s := table.DefaultStyles()
 	s.Header = base().
 		BorderStyle(lipgloss.NormalBorder()).
@@ -43,17 +56,11 @@ func newQueue() queueModel {
 	if !transparent {
 		s.Header = s.Header.BorderBackground(colorBG)
 	}
-	t.SetStyles(s)
+	q.table.SetStyles(s)
 
-	f := textinput.New()
-	f.PromptStyle = styleKey
-	f.TextStyle = styleValue
-	f.PlaceholderStyle = styleDim
-	f.Prompt = "/"
-	f.Placeholder = "texto libre, o impresora:epson usuario:ana estado:retenido"
-	f.CharLimit = 80
-
-	return queueModel{table: t, filter: f}
+	q.filter.PromptStyle = styleKey
+	q.filter.TextStyle = styleValue
+	q.filter.PlaceholderStyle = styleDim
 }
 
 // queueColumns reparte el ancho disponible dejando que el nombre del documento

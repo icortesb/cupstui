@@ -140,13 +140,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.queue.setSize(m.width, m.bodyHeight()-2)
-		m.logs.setSize(m.width, m.bodyHeight()-2)
-		m.print.setSize(m.width, m.bodyHeight()-2)
-		m.add.setSize(m.width, m.bodyHeight())
-		m.helpVP.Width = m.width
-		m.helpVP.Height = m.bodyHeight()
-		m.helpVP.SetContent(helpView(m.width))
+		m.resize()
 		return m, nil
 
 	case tickMsg:
@@ -164,7 +158,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case snapshotMsg:
 		m.refreshing = false
+		hadError := m.err != nil
 		m.err = msg.err
+		if hadError != (m.err != nil) {
+			// El cartel ocupa una línea: al aparecer o desaparecer cambia el
+			// alto disponible para el contenido.
+			m.resize()
+		}
 		if msg.err == nil {
 			m.snap = msg.snap
 			m.loaded = true
@@ -235,7 +235,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.add.handleKey(msg, m.client)
 	}
 
-	if m.tab == tabPrint {
+	// tab y shift+tab quedan siempre para cambiar de pestaña: en el formulario
+	// las flechas ←/→ cambian el valor del campo, así que sin esto no habría
+	// forma evidente de salir de la pantalla.
+	isTabSwitch := msg.String() == "tab" || msg.String() == "shift+tab"
+
+	if m.tab == tabPrint && !isTabSwitch {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -280,6 +285,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
+
+	case key.Matches(msg, keys.Transparent):
+		SetTransparent(!transparent)
+		m.restyle()
+		return m, nil
 
 	case key.Matches(msg, keys.Help):
 		m.showHelp = !m.showHelp
@@ -372,12 +382,19 @@ func (m Model) handlePrintKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down":
 		m.print.move(1)
 		return m, nil
-	case "left", "-":
-		m.print.cycle(-1, m.snap.Printers)
-		return m, nil
-	case "right", "+":
-		m.print.cycle(1, m.snap.Printers)
-		return m, nil
+	}
+
+	// Sobre un campo de texto, ←/→ mueven el cursor dentro de lo escrito; solo
+	// cambian el valor en los campos de opciones.
+	if !m.print.editing() {
+		switch msg.String() {
+		case "left", "-":
+			m.print.cycle(-1, m.snap.Printers)
+			return m, nil
+		case "right", "+":
+			m.print.cycle(1, m.snap.Printers)
+			return m, nil
+		}
 	}
 
 	// Con un campo de texto enfocado, las letras escriben; si no, j/k/h/l
@@ -569,9 +586,34 @@ func describeError(err error) string {
 	return err.Error()
 }
 
+// resize reparte el tamaño de la ventana entre las vistas.
+func (m *Model) resize() {
+	body := m.bodyHeight()
+	m.queue.setSize(m.width, body-2)
+	m.logs.setSize(m.width, body-2)
+	m.print.setSize(m.width, body-2)
+	m.add.setSize(m.width, body)
+	m.helpVP.Width = m.width
+	m.helpVP.Height = body
+	m.helpVP.SetContent(helpView(m.width))
+}
+
+// restyle vuelve a aplicar los estilos a los componentes que se los guardaron
+// al construirse. Hace falta al cambiar el modo transparente en caliente.
+func (m *Model) restyle() {
+	m.queue.restyle()
+	m.print.restyle()
+	m.add.restyle()
+	m.helpVP.SetContent(helpView(m.width))
+}
+
+// bodyHeight es lo que queda para el contenido: el encabezado ocupa dos líneas
+// (título y borde), el pie una, y el cartel de error otra cuando está.
 func (m Model) bodyHeight() int {
-	// alto total menos encabezado (2), cartel de error (1), pie (1) y aire.
-	h := m.height - 6
+	h := m.height - 3
+	if m.err != nil {
+		h--
+	}
 	if h < 3 {
 		h = 3
 	}

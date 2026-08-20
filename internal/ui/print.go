@@ -53,16 +53,11 @@ func newPrint() printModel {
 	path.Prompt = ""
 	path.Placeholder = "ruta del archivo (ctrl+o para buscar)"
 	path.CharLimit = 300
-	path.PromptStyle = styleKey
-	path.TextStyle = styleValue
-	path.PlaceholderStyle = styleDim
 
 	ranges := textinput.New()
 	ranges.Prompt = ""
 	ranges.Placeholder = "todas (ej: 1-5,8)"
 	ranges.CharLimit = 40
-	ranges.TextStyle = styleValue
-	ranges.PlaceholderStyle = styleDim
 
 	fp := filepicker.New()
 	fp.CurrentDirectory, _ = os.UserHomeDir()
@@ -76,7 +71,22 @@ func newPrint() printModel {
 		picker:  fp,
 	}
 	m.applyFocus()
+	m.restyle()
 	return m
+}
+
+// restyle vuelve a aplicar los estilos a los campos de texto.
+func (p *printModel) restyle() {
+	styleInput(&p.path)
+	styleInput(&p.ranges)
+}
+
+// styleInput deja un campo de texto con los estilos vigentes.
+func styleInput(t *textinput.Model) {
+	t.PromptStyle = styleKey
+	t.TextStyle = styleValue
+	t.PlaceholderStyle = styleDim
+	t.Cursor.Style = styleAccentText
 }
 
 func (p *printModel) setSize(width, height int) {

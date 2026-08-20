@@ -57,16 +57,23 @@ func newAdd() addModel {
 		t.Prompt = ""
 		t.Placeholder = placeholder
 		t.CharLimit = limit
-		t.TextStyle = styleValue
-		t.PlaceholderStyle = styleDim
 		return t
 	}
-	return addModel{
+	a := addModel{
 		uri:       mk("socket://192.168.0.50:9100", 200),
 		ppdFilter: mk("filtrar drivers por modelo", 60),
 		name:      mk("sin espacios ni / ni #", 127),
 		info:      mk("descripción (opcional)", 100),
 		location:  mk("ubicación (opcional)", 100),
+	}
+	a.restyle()
+	return a
+}
+
+// restyle vuelve a aplicar los estilos a los campos de texto.
+func (a *addModel) restyle() {
+	for _, t := range []*textinput.Model{&a.uri, &a.ppdFilter, &a.name, &a.info, &a.location} {
+		styleInput(t)
 	}
 }
 
