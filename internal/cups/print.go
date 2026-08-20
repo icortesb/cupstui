@@ -35,13 +35,13 @@ const (
 func (d Duplex) String() string {
 	switch d {
 	case DuplexNone:
-		return "una cara"
+		return "one-sided"
 	case DuplexLongEdge:
-		return "dos caras (borde largo)"
+		return "two-sided, long edge"
 	case DuplexShortEdge:
-		return "dos caras (borde corto)"
+		return "two-sided, short edge"
 	default:
-		return "según la impresora"
+		return "printer default"
 	}
 }
 
@@ -72,9 +72,9 @@ func (c ColorMode) String() string {
 	case ColorColor:
 		return "color"
 	case ColorMono:
-		return "blanco y negro"
+		return "black and white"
 	default:
-		return "según la impresora"
+		return "printer default"
 	}
 }
 
@@ -101,11 +101,11 @@ const (
 func (o Orientation) String() string {
 	switch o {
 	case OrientationPortrait:
-		return "vertical"
+		return "portrait"
 	case OrientationLandscape:
-		return "horizontal"
+		return "landscape"
 	default:
-		return "según la impresora"
+		return "printer default"
 	}
 }
 
@@ -140,10 +140,10 @@ var pageRangePattern = regexp.MustCompile(`^\d+(-\d+)?(,\d+(-\d+)?)*$`)
 
 func (o PrintOptions) validate() error {
 	if o.Copies < 1 {
-		return fmt.Errorf("las copias tienen que ser al menos 1")
+		return fmt.Errorf("copies must be at least 1")
 	}
 	if o.Copies > maxCopies {
-		return fmt.Errorf("demasiadas copias (máximo %d)", maxCopies)
+		return fmt.Errorf("too many copies (maximum %d)", maxCopies)
 	}
 	if o.PageRanges != "" {
 		if err := validatePageRanges(o.PageRanges); err != nil {
@@ -155,18 +155,18 @@ func (o PrintOptions) validate() error {
 
 func validatePageRanges(ranges string) error {
 	if !pageRangePattern.MatchString(ranges) {
-		return fmt.Errorf("rango de páginas inválido: %q (se espera 1, 1-5 o 2,4,6-8)", ranges)
+		return fmt.Errorf("invalid page range %q — expected 1, 1-5 or 2,4,6-8", ranges)
 	}
 	for _, part := range strings.Split(ranges, ",") {
 		from, to, hasDash := strings.Cut(part, "-")
 		first, _ := strconv.Atoi(from)
 		if first < 1 {
-			return fmt.Errorf("las páginas se numeran desde 1, no desde %d", first)
+			return fmt.Errorf("pages are numbered from 1, not from %d", first)
 		}
 		if hasDash {
 			last, _ := strconv.Atoi(to)
 			if last < first {
-				return fmt.Errorf("el rango %q termina antes de empezar", part)
+				return fmt.Errorf("range %q ends before it starts", part)
 			}
 		}
 	}
@@ -213,11 +213,11 @@ var jobIDPattern = regexp.MustCompile(`-(\d+)\s`)
 func Submit(path string, o PrintOptions) (int, error) {
 	if fi, err := os.Stat(path); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return 0, &Error{Kind: KindNotFound, Hint: "el archivo no existe: " + path, Err: err}
+			return 0, &Error{Kind: KindNotFound, Hint: "file not found: " + path, Err: err}
 		}
 		return 0, classifyFileError(err)
 	} else if fi.IsDir() {
-		return 0, &Error{Kind: KindUnknown, Hint: path + " es un directorio, no un archivo"}
+		return 0, &Error{Kind: KindUnknown, Hint: path + " is a directory, not a file"}
 	}
 
 	args, err := lpArgs(path, o)
@@ -230,7 +230,7 @@ func Submit(path string, o PrintOptions) (int, error) {
 		if errors.Is(err, exec.ErrNotFound) {
 			return 0, &Error{
 				Kind: KindNotFound,
-				Hint: "no se encontró el comando lp (falta el paquete cups-client)",
+				Hint: "lp command not found — install the cups-client package",
 				Err:  err,
 			}
 		}

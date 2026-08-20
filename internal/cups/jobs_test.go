@@ -44,14 +44,14 @@ func TestJobStateMapping(t *testing.T) {
 		want  JobState
 		label string
 	}{
-		{3, JobPending, "en espera"},
-		{4, JobHeld, "retenido"},
-		{5, JobProcessing, "imprimiendo"},
-		{6, JobStopped, "detenido"},
-		{7, JobCanceled, "cancelado"},
-		{8, JobAborted, "abortado"},
-		{9, JobCompleted, "completado"},
-		{99, JobUnknown, "desconocido"},
+		{3, JobPending, "pending"},
+		{4, JobHeld, "held"},
+		{5, JobProcessing, "printing"},
+		{6, JobStopped, "stopped"},
+		{7, JobCanceled, "canceled"},
+		{8, JobAborted, "aborted"},
+		{9, JobCompleted, "completed"},
+		{99, JobUnknown, "unknown"},
 	}
 	for _, c := range cases {
 		t.Run(c.label, func(t *testing.T) {

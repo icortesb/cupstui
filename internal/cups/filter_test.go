@@ -40,7 +40,7 @@ func TestFilterJobs(t *testing.T) {
 		{"por usuario", "ana", []int{43, 44}},
 		{"por impresora", "epson", []int{42, 44}},
 		{"por documento", "factura", []int{43}},
-		{"por estado en castellano", "retenido", []int{44}},
+		{"por estado", "held", []int{44}},
 		{"por id", "42", []int{42}},
 		{"sin coincidencias", "zzz", []int{}},
 		{"ignora mayúsculas", "ICORTES", []int{42}},
@@ -68,14 +68,14 @@ func TestFilterJobsWithFieldQualifiers(t *testing.T) {
 		query string
 		want  []int
 	}{
-		{"por impresora", "impresora:epson", []int{42, 44}},
-		{"por usuario", "usuario:ana", []int{43, 44}},
-		{"por estado", "estado:retenido", []int{44}},
-		{"dos calificadores se acumulan", "usuario:ana impresora:epson", []int{44}},
-		{"calificador más texto libre", "usuario:ana recibo", []int{44}},
-		{"alias en inglés", "printer:hp", []int{43}},
-		{"calificador sin coincidencias", "usuario:nadie", []int{}},
-		{"calificador vacío se ignora", "usuario:", []int{42, 43, 44}},
+		{"por impresora", "printer:epson", []int{42, 44}},
+		{"por usuario", "user:ana", []int{43, 44}},
+		{"por estado calificado", "state:held", []int{44}},
+		{"dos calificadores se acumulan", "user:ana printer:epson", []int{44}},
+		{"calificador más texto libre", "user:ana recibo", []int{44}},
+		{"alias de documento", "doc:factura", []int{43}},
+		{"calificador sin coincidencias", "user:nadie", []int{}},
+		{"calificador vacío se ignora", "user:", []int{42, 43, 44}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestFilterJobsWithFieldQualifiers(t *testing.T) {
 func TestFilterJobsQualifierDoesNotMatchOtherFields(t *testing.T) {
 	// "ana" es un usuario, no una impresora: el calificador tiene que acotar
 	// la búsqueda, no ampliarla.
-	if got := ids(FilterJobs(sampleJobs(), "impresora:ana")); !equal(got, []int{}) {
-		t.Errorf("FilterJobs(\"impresora:ana\") = %v, quiero vacío", got)
+	if got := ids(FilterJobs(sampleJobs(), "printer:ana")); !equal(got, []int{}) {
+		t.Errorf("FilterJobs(\"printer:ana\") = %v, quiero vacío", got)
 	}
 }

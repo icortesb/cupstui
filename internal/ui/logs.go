@@ -76,9 +76,9 @@ func (l logsModel) view(width int) string {
 	f := l.current()
 
 	title := styleBold.Render(f.Name) + styleDim.Render("  "+f.Desc)
-	state := styleDim.Render("pausado — G para volver al final")
+	state := styleDim.Render("paused — G to resume")
 	if l.follow {
-		state = styleOKText.Render("siguiendo")
+		state = styleOKText.Render("following")
 	}
 	gap := width - lipgloss.Width(title) - lipgloss.Width(state) - 2
 	if gap < 1 {
@@ -89,12 +89,12 @@ func (l logsModel) view(width int) string {
 	if l.err != nil {
 		return strings.Join([]string{
 			header, "",
-			"  " + styleErrText.Render("No se pudo leer "+f.Path),
+			"  " + styleErrText.Render("Could not read "+f.Path),
 			"  " + styleDim.Render(describeError(l.err)),
 		}, "\n")
 	}
 	if len(l.lines) == 0 {
-		return header + "\n\n" + styleDim.Render("  El registro está vacío.")
+		return header + "\n\n" + styleDim.Render("  The log is empty.")
 	}
 	return header + "\n" + l.vp.View()
 }

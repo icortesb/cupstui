@@ -150,7 +150,7 @@ func (c *Client) getDefault(ctx context.Context) (name string, err error) {
 		return "", err
 	}
 	if len(resp.PrinterAttributes) == 0 {
-		return "", fmt.Errorf("CUPS no informó impresora por omisión")
+		return "", fmt.Errorf("CUPS reported no default printer")
 	}
 	return attrString(resp.PrinterAttributes[0], "printer-name"), nil
 }
@@ -162,7 +162,7 @@ func recovered(r interface{}, err error) error {
 	if r == nil {
 		return err
 	}
-	return fmt.Errorf("respuesta IPP inesperada: %v", r)
+	return fmt.Errorf("unexpected IPP response: %v", r)
 }
 
 // CancelJob cancela un trabajo por id.

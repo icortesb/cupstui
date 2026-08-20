@@ -12,7 +12,7 @@ import (
 // dashboardView muestra una tarjeta por impresora y el resumen de la cola.
 func dashboardView(snap cups.Snapshot, width int) string {
 	if len(snap.Printers) == 0 {
-		return styleDim.Render("  No hay impresoras configuradas en este CUPS.")
+		return styleDim.Render("  No printers configured on this CUPS server.")
 	}
 
 	cards := make([]string, 0, len(snap.Printers))
@@ -33,12 +33,12 @@ func printerCard(p cups.Printer, jobs int) string {
 		stateBadge(p),
 	}
 	if p.IsDefault {
-		lines = append(lines, styleKey.Render("por omisión"))
+		lines = append(lines, styleKey.Render("default"))
 	}
 	if !p.Accepting {
-		lines = append(lines, styleWarnText.Render("rechaza trabajos"))
+		lines = append(lines, styleWarnText.Render("rejecting jobs"))
 	}
-	lines = append(lines, styleLabel.Render("en cola: ")+styleValue.Render(fmt.Sprint(jobs)))
+	lines = append(lines, styleLabel.Render("queued: ")+styleValue.Render(fmt.Sprint(jobs)))
 
 	if msg := problemLine(p); msg != "" {
 		lines = append(lines, styleWarnText.Render(truncate(msg, 28)))
@@ -80,9 +80,9 @@ func queueSummary(snap cups.Snapshot) string {
 
 	total := styleBold.Render(fmt.Sprint(len(snap.Jobs)))
 	act := styleBold.Render(fmt.Sprint(activos))
-	line := fmt.Sprintf("  %s en cola · %s imprimiendo ahora", total, act)
+	line := fmt.Sprintf("  %s queued · %s printing now", total, act)
 	if len(snap.Jobs) == 0 {
-		line = "  " + styleDim.Render("No hay trabajos en cola.")
+		line = "  " + styleDim.Render("No jobs queued.")
 	}
 	return line
 }

@@ -15,13 +15,13 @@ const (
 func (s PrinterState) String() string {
 	switch s {
 	case StateIdle:
-		return "inactiva"
+		return "idle"
 	case StatePrinting:
-		return "imprimiendo"
+		return "printing"
 	case StateStopped:
-		return "detenida"
+		return "stopped"
 	default:
-		return "desconocido"
+		return "unknown"
 	}
 }
 

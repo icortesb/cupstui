@@ -16,19 +16,14 @@ const (
 	fieldName
 )
 
-// qualifiers son los prefijos que acotan un término a un solo campo. Se
-// aceptan en castellano y en inglés porque la salida de CUPS y la costumbre
-// mezclan los dos.
+// qualifiers son los prefijos que acotan un término a un solo campo.
 var qualifiers = map[string]field{
-	"usuario":   fieldUser,
-	"user":      fieldUser,
-	"impresora": fieldPrinter,
-	"printer":   fieldPrinter,
-	"estado":    fieldState,
-	"state":     fieldState,
-	"documento": fieldName,
-	"doc":       fieldName,
-	"name":      fieldName,
+	"user":     fieldUser,
+	"printer":  fieldPrinter,
+	"state":    fieldState,
+	"document": fieldName,
+	"doc":      fieldName,
+	"name":     fieldName,
 }
 
 // term es un término de búsqueda ya interpretado.

@@ -15,14 +15,14 @@ type helpSection struct {
 
 func helpView(width int) string {
 	sections := []helpSection{
-		{"Navegación", []key.Binding{keys.Down, keys.NextTab, keys.PrevTab, keys.Tab1, keys.Tab2, keys.Tab3, keys.Tab4, keys.Tab5}},
-		{"Cola", []key.Binding{keys.HoldJob, keys.Cancel, keys.CancelAll, keys.Filter}},
-		{"Impresoras", []key.Binding{keys.Toggle, keys.Default, keys.Accepting, keys.AddPrinter}},
-		{"Imprimir", []key.Binding{
-			key.NewBinding(key.WithKeys("down"), key.WithHelp("↑↓ j/k", "cambiar de campo")),
-			key.NewBinding(key.WithKeys("left"), key.WithHelp("←→ h/l", "cambiar el valor")),
-			key.NewBinding(key.WithKeys("ctrl+o"), key.WithHelp("ctrl+o", "buscar archivo")),
-			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "imprimir")),
+		{"Navigation", []key.Binding{keys.Down, keys.NextTab, keys.PrevTab, keys.Tab1, keys.Tab2, keys.Tab3, keys.Tab4, keys.Tab5}},
+		{"Queue", []key.Binding{keys.HoldJob, keys.Cancel, keys.CancelAll, keys.Filter}},
+		{"Printers", []key.Binding{keys.Toggle, keys.Default, keys.Accepting, keys.AddPrinter, keys.DeletePrinter}},
+		{"Print", []key.Binding{
+			key.NewBinding(key.WithKeys("down"), key.WithHelp("↑↓ j/k", "change field")),
+			key.NewBinding(key.WithKeys("left"), key.WithHelp("←→ h/l", "change value")),
+			key.NewBinding(key.WithKeys("ctrl+o"), key.WithHelp("ctrl+o", "browse files")),
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "print")),
 		}},
 		{"Logs", []key.Binding{keys.NextLog}},
 		{"General", []key.Binding{keys.Refresh, keys.Transparent, keys.Escape, keys.Help, keys.Quit}},
@@ -60,14 +60,14 @@ func renderSection(sec helpSection) string {
 
 func filterHelp() string {
 	var b strings.Builder
-	b.WriteString(styleBold.Render("  Filtro de la cola"))
+	b.WriteString(styleBold.Render("  Queue filter"))
 	b.WriteString("\n    ")
-	b.WriteString(styleDim.Render("texto libre, o acotado a un campo: "))
-	b.WriteString(styleKey.Render("impresora:") + styleDim.Render("epson  "))
-	b.WriteString(styleKey.Render("usuario:") + styleDim.Render("ana  "))
-	b.WriteString(styleKey.Render("estado:") + styleDim.Render("retenido"))
+	b.WriteString(styleDim.Render("free text, or scoped to one field: "))
+	b.WriteString(styleKey.Render("printer:") + styleDim.Render("epson  "))
+	b.WriteString(styleKey.Render("user:") + styleDim.Render("ana  "))
+	b.WriteString(styleKey.Render("state:") + styleDim.Render("held"))
 	b.WriteString("\n")
-	b.WriteString(styleDim.Render("    Las confirmaciones se responden con y (sí) o n / esc (no)."))
+	b.WriteString(styleDim.Render("    Terms combine: every one must match. Confirm prompts answer y or n."))
 	return b.String()
 }
 
@@ -81,18 +81,18 @@ func pad(s string, n int) string {
 // shortHelp es la línea de atajos del pie, distinta según la pestaña.
 func shortHelp(t tab, filtering bool) string {
 	if filtering {
-		return hint("enter", "aplicar") + " · " + hint("esc", "limpiar filtro")
+		return hint("enter", "apply") + " · " + hint("esc", "clear filter")
 	}
-	common := hint("tab", "cambiar") + " · " + hint("r", "refrescar") + " · " + hint("?", "ayuda") + " · " + hint("q", "salir")
+	common := hint("tab", "switch") + " · " + hint("r", "refresh") + " · " + hint("?", "help") + " · " + hint("q", "quit")
 	switch t {
 	case tabQueue:
-		return hint("j/k", "mover") + " · " + hint("p", "pausar") + " · " + hint("x", "cancelar") + " · " + hint("X", "todos") + " · " + hint("/", "filtrar") + " · " + common
+		return hint("j/k", "move") + " · " + hint("p", "hold") + " · " + hint("x", "cancel") + " · " + hint("X", "all") + " · " + hint("/", "filter") + " · " + common
 	case tabPrint:
-		return hint("↑↓", "campo") + " · " + hint("←→", "valor") + " · " + hint("ctrl+o", "buscar") + " · " + hint("enter", "imprimir") + " · " + hint("tab", "cambiar de pestaña")
+		return hint("↑↓", "field") + " · " + hint("←→", "value") + " · " + hint("ctrl+o", "browse") + " · " + hint("enter", "print") + " · " + hint("tab", "switch tab")
 	case tabLogs:
-		return hint("j/k", "desplazar") + " · " + hint("G", "ir al final") + " · " + hint("n", "otro registro") + " · " + common
+		return hint("j/k", "scroll") + " · " + hint("G", "jump to end") + " · " + hint("n", "next log") + " · " + common
 	case tabPrinters:
-		return hint("j/k", "mover") + " · " + hint("e", "habilitar/deshabilitar") + " · " + hint("d", "por omisión") + " · " + hint("a", "aceptar") + " · " + hint("A", "agregar") + " · " + common
+		return hint("j/k", "move") + " · " + hint("e", "enable") + " · " + hint("d", "default") + " · " + hint("a", "accept") + " · " + hint("A", "add") + " · " + hint("x", "remove") + " · " + common
 	default:
 		return common
 	}

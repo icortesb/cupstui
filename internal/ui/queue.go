@@ -28,7 +28,7 @@ func newQueue() queueModel {
 	)
 	f := textinput.New()
 	f.Prompt = "/"
-	f.Placeholder = "texto libre, o impresora:epson usuario:ana estado:retenido"
+	f.Placeholder = "free text, or printer:epson user:ana state:held"
 	f.CharLimit = 80
 
 	q := queueModel{table: t, filter: f}
@@ -73,11 +73,11 @@ func queueColumns(width int) []table.Column {
 	}
 	return []table.Column{
 		{Title: "ID", Width: 6},
-		{Title: "USUARIO", Width: 12},
-		{Title: "DOCUMENTO", Width: doc},
-		{Title: "IMPRESORA", Width: 18},
-		{Title: "ESTADO", Width: 13},
-		{Title: "HORA", Width: 7},
+		{Title: "USER", Width: 12},
+		{Title: "DOCUMENT", Width: doc},
+		{Title: "PRINTER", Width: 18},
+		{Title: "STATE", Width: 13},
+		{Title: "TIME", Width: 7},
 	}
 }
 
@@ -104,7 +104,7 @@ func (q *queueModel) setJobs(jobs []cups.Job) {
 		}
 		name := j.Name
 		if name == "" {
-			name = "(sin nombre)"
+			name = "(untitled)"
 		}
 		rows = append(rows, table.Row{
 			strconv.Itoa(j.ID), j.User, name, j.Printer, j.State.String(), hora,
@@ -145,15 +145,15 @@ func (q *queueModel) stopFiltering(clear bool) {
 }
 
 func (q queueModel) view(total int) string {
-	header := styleDim.Render(fmt.Sprintf("%d de %d trabajos", len(q.visible), total))
+	header := styleDim.Render(fmt.Sprintf("%d of %d jobs", len(q.visible), total))
 	if q.filtering || q.filter.Value() != "" {
 		header = lipgloss.JoinHorizontal(lipgloss.Left, q.filter.View(), "  ", header)
 	}
 
 	if len(q.visible) == 0 {
-		empty := "La cola está vacía."
+		empty := "The queue is empty."
 		if q.filter.Value() != "" {
-			empty = "Ningún trabajo coincide con el filtro."
+			empty = "No jobs match the filter."
 		}
 		return lipgloss.JoinVertical(lipgloss.Left, header, "", styleDim.Render("  "+empty))
 	}

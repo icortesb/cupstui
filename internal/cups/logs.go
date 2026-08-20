@@ -17,9 +17,9 @@ type LogFile struct {
 // LogFiles son los registros estándar de CUPS. Las rutas son las de la
 // configuración por omisión; si alguna no existe, la UI lo informa.
 var LogFiles = []LogFile{
-	{Name: "error_log", Path: "/var/log/cups/error_log", Desc: "errores y avisos del demonio"},
-	{Name: "access_log", Path: "/var/log/cups/access_log", Desc: "pedidos HTTP/IPP atendidos"},
-	{Name: "page_log", Path: "/var/log/cups/page_log", Desc: "páginas impresas por trabajo"},
+	{Name: "error_log", Path: "/var/log/cups/error_log", Desc: "daemon errors and warnings"},
+	{Name: "access_log", Path: "/var/log/cups/access_log", Desc: "HTTP/IPP requests served"},
+	{Name: "page_log", Path: "/var/log/cups/page_log", Desc: "pages printed per job"},
 }
 
 // tailWindow es cuánto se lee desde el final del archivo. El error_log crece
@@ -73,9 +73,9 @@ func Tail(path string, n int) ([]string, error) {
 func classifyFileError(err error) error {
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
-		return &Error{Kind: KindNotFound, Hint: "el archivo de registro no existe", Err: err}
+		return &Error{Kind: KindNotFound, Hint: "log file not found", Err: err}
 	case errors.Is(err, fs.ErrPermission):
-		return &Error{Kind: KindForbidden, Hint: "sin permisos para leer el registro de CUPS", Err: err}
+		return &Error{Kind: KindForbidden, Hint: "permission denied reading the CUPS log", Err: err}
 	default:
 		return &Error{Kind: KindUnknown, Hint: err.Error(), Err: err}
 	}

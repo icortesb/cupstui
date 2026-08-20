@@ -322,3 +322,39 @@ func TestFilePickerStartsInTheHomeDirectory(t *testing.T) {
 		t.Errorf("el buscador arranca en %q, quiero %q", got, home)
 	}
 }
+
+func TestRemovingAPrinterWarnsAboutQueuedJobs(t *testing.T) {
+	// Deleting a queue discards whatever is still on it, so the count belongs
+	// in the prompt rather than in a surprise afterwards.
+	withColor(t)
+	m := testModel()
+	m.tab = tabPrinters
+	m.printers.cursor = 0 // Epson_L3150, which has one job in testModel
+
+	next, _ := m.Update(press("x"))
+	m = next.(Model)
+
+	if m.confirm == nil {
+		t.Fatal("removing a printer must ask for confirmation")
+	}
+	if !strings.Contains(m.confirm.prompt, "1 queued job") {
+		t.Errorf("prompt = %q, want it to mention the queued job", m.confirm.prompt)
+	}
+}
+
+func TestRemovingAnEmptyPrinterAsksPlainly(t *testing.T) {
+	withColor(t)
+	m := testModel()
+	m.tab = tabPrinters
+	m.printers.cursor = 1 // HP_LaserJet, with no jobs
+
+	next, _ := m.Update(press("x"))
+	m = next.(Model)
+
+	if m.confirm == nil {
+		t.Fatal("removing a printer must ask for confirmation")
+	}
+	if strings.Contains(m.confirm.prompt, "queued") {
+		t.Errorf("prompt = %q, should not mention jobs when there are none", m.confirm.prompt)
+	}
+}

@@ -35,7 +35,7 @@ const (
 	tabLogs
 )
 
-var tabNames = []string{"Dashboard", "Cola", "Impresoras", "Imprimir", "Logs"}
+var tabNames = []string{"Dashboard", "Queue", "Printers", "Print", "Logs"}
 
 type (
 	tickMsg     time.Time
@@ -238,7 +238,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, func() tea.Msg { return run() }
 		case "n", "esc", "q", "ctrl+c":
 			m.confirm = nil
-			m.setStatus("Cancelado.", false)
+			m.setStatus("Cancelled.", false)
 			return m, nil
 		}
 		return m, nil
@@ -332,7 +332,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Refresh):
-		m.setStatus("Refrescando…", false)
+		m.setStatus("Refreshing…", false)
 		if m.refreshing {
 			return m, nil
 		}
@@ -451,7 +451,7 @@ var formKeys = map[string]bool{
 func (m Model) submitPrint() (tea.Model, tea.Cmd) {
 	path := m.print.file()
 	if path == "" {
-		m.setStatus("Elegí un archivo primero (ctrl+o para buscar).", true)
+		m.setStatus("Select a file first — ctrl+o to browse.", true)
 		return m, nil
 	}
 
@@ -463,9 +463,9 @@ func (m Model) submitPrint() (tea.Model, tea.Cmd) {
 			return actionMsg{err: err}
 		}
 		if id > 0 {
-			return actionMsg{text: fmt.Sprintf("%s enviado a imprimir (trabajo %d).", name, id)}
+			return actionMsg{text: fmt.Sprintf("%s sent to printer — job %d.", name, id)}
 		}
-		return actionMsg{text: name + " enviado a imprimir."}
+		return actionMsg{text: name + " sent to printer."}
 	}
 }
 
@@ -494,13 +494,13 @@ func (m Model) handleQueueKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Cancel):
 		job, ok := m.queue.selected()
 		if !ok {
-			m.setStatus("No hay ningún trabajo seleccionado.", true)
+			m.setStatus("No job selected.", true)
 			return m, nil
 		}
 		c := m.client
 		m.confirm = &confirmation{
-			prompt: fmt.Sprintf("¿Cancelar el trabajo %d (%s)?", job.ID, job.Name),
-			run: action(fmt.Sprintf("Trabajo %d cancelado.", job.ID), func() error {
+			prompt: fmt.Sprintf("Cancel job %d (%s)?", job.ID, job.Name),
+			run: action(fmt.Sprintf("Job %d cancelled.", job.ID), func() error {
 				return c.CancelJob(job.ID)
 			}),
 		}
@@ -509,29 +509,29 @@ func (m Model) handleQueueKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.HoldJob):
 		job, ok := m.queue.selected()
 		if !ok {
-			m.setStatus("No hay ningún trabajo seleccionado.", true)
+			m.setStatus("No job selected.", true)
 			return m, nil
 		}
 		c := m.client
 		if job.State == cups.JobHeld {
-			return m, action(fmt.Sprintf("Trabajo %d reanudado.", job.ID), func() error {
+			return m, action(fmt.Sprintf("Job %d released.", job.ID), func() error {
 				return c.ReleaseJob(job.ID)
 			})
 		}
-		return m, action(fmt.Sprintf("Trabajo %d pausado.", job.ID), func() error {
+		return m, action(fmt.Sprintf("Job %d held.", job.ID), func() error {
 			return c.HoldJob(job.ID)
 		})
 
 	case key.Matches(msg, keys.CancelAll):
 		if len(m.snap.Jobs) == 0 {
-			m.setStatus("La cola ya está vacía.", true)
+			m.setStatus("The queue is already empty.", true)
 			return m, nil
 		}
 		c := m.client
 		n := len(m.snap.Jobs)
 		m.confirm = &confirmation{
-			prompt: fmt.Sprintf("¿Cancelar los %d trabajos de la cola?", n),
-			run: action(fmt.Sprintf("%d trabajos cancelados.", n), func() error {
+			prompt: fmt.Sprintf("Cancel all %d queued jobs?", n),
+			run: action(fmt.Sprintf("%d jobs cancelled.", n), func() error {
 				return c.CancelAllJobs("")
 			}),
 		}
@@ -563,27 +563,46 @@ func (m Model) handlePrintersKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Toggle):
 		if p.State == cups.StateStopped {
-			return m, action(fmt.Sprintf("%s habilitada.", p.Name), func() error {
+			return m, action(fmt.Sprintf("%s enabled.", p.Name), func() error {
 				return c.EnablePrinter(p.Name)
 			})
 		}
-		return m, action(fmt.Sprintf("%s deshabilitada.", p.Name), func() error {
+		return m, action(fmt.Sprintf("%s disabled.", p.Name), func() error {
 			return c.DisablePrinter(p.Name)
 		})
 
 	case key.Matches(msg, keys.Default):
-		return m, action(fmt.Sprintf("%s es la impresora por omisión.", p.Name), func() error {
+		return m, action(fmt.Sprintf("%s set as default.", p.Name), func() error {
 			return c.SetDefault(p.Name)
 		})
 
 	case key.Matches(msg, keys.AddPrinter):
 		return m, m.add.start(m.client)
 
+	case key.Matches(msg, keys.DeletePrinter):
+		c := m.client
+		queued := jobsFor(m.snap.Jobs, p.Name)
+		prompt := fmt.Sprintf("Remove printer %s?", p.Name)
+		if queued > 0 {
+			// Deleting a queue discards whatever is still on it, so the count
+			// belongs in the prompt rather than in a surprise afterwards.
+			prompt = fmt.Sprintf("Remove printer %s and discard %d queued job(s)?", p.Name, queued)
+		}
+		m.confirm = &confirmation{
+			prompt: prompt,
+			run: action(fmt.Sprintf("Printer %s removed.", p.Name), func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+				defer cancel()
+				return c.DeletePrinter(ctx, p.Name)
+			}),
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.Accepting):
 		accept := !p.Accepting
-		text := fmt.Sprintf("%s ya no acepta trabajos nuevos.", p.Name)
+		text := fmt.Sprintf("%s is rejecting new jobs.", p.Name)
 		if accept {
-			text = fmt.Sprintf("%s acepta trabajos nuevos.", p.Name)
+			text = fmt.Sprintf("%s is accepting new jobs.", p.Name)
 		}
 		return m, action(text, func() error {
 			return c.SetAccepting(p.Name, accept)
@@ -622,12 +641,12 @@ func (m *Model) resize() {
 // rememberTransparency guarda la preferencia para la próxima sesión.
 func rememberTransparency(on bool) tea.Cmd {
 	return func() tea.Msg {
-		text := "Fondo propio. Se recordará para la próxima vez."
+		text := "Opaque background."
 		if on {
-			text = "Fondo del terminal. Se recordará para la próxima vez."
+			text = "Transparent background."
 		}
 		if err := config.Save(config.Config{Transparent: on}); err != nil {
-			return statusMsg{err: fmt.Errorf("no se pudo guardar la preferencia: %w", err)}
+			return statusMsg{err: fmt.Errorf("could not save preference: %w", err)}
 		}
 		return statusMsg{text: text}
 	}
@@ -702,7 +721,7 @@ func (m Model) headerView() string {
 
 func (m Model) syncLabel() string {
 	if !m.loaded {
-		return "conectando…"
+		return "connecting…"
 	}
 	return fmt.Sprintf("⟳ %s ", m.lastSync.Format("15:04:05"))
 }
@@ -713,7 +732,7 @@ func (m Model) bannerView() string {
 	}
 	text := "⚠ " + describeError(m.err)
 	if m.loaded {
-		text += " (mostrando la última lectura buena)"
+		text += " — showing last known state"
 	}
 	return styleBanner.Width(m.width).Render(truncate(text, m.width-2))
 }
@@ -726,11 +745,10 @@ func (m Model) bodyView() string {
 		return m.helpVP.View()
 	}
 	if !m.loaded && m.err != nil {
-		return styleDim.Render("\n  Sin datos todavía. Se reintenta cada " +
-			refreshInterval.String() + ".")
+		return styleDim.Render("\n  No data yet. Retrying every " + refreshInterval.String() + ".")
 	}
 	if !m.loaded {
-		return styleDim.Render("\n  Consultando CUPS…")
+		return styleDim.Render("\n  Querying CUPS…")
 	}
 
 	switch m.tab {
@@ -750,7 +768,7 @@ func (m Model) bodyView() string {
 func (m Model) footerView() string {
 	if m.confirm != nil {
 		return styleStatusErr.Width(m.width).Render(
-			m.confirm.prompt + "  " + styleKey.Render("y") + " sí  " + styleKey.Render("n") + " no")
+			m.confirm.prompt + "  " + styleKey.Render("y") + " yes  " + styleKey.Render("n") + " no")
 	}
 	if m.status != "" {
 		style := styleStatusOK
@@ -761,7 +779,7 @@ func (m Model) footerView() string {
 	}
 	if m.showHelp {
 		return styleStatusBar.Width(m.width).Render(
-			hint("j/k", "desplazar") + " · " + hint("?", "cerrar la ayuda"))
+			hint("j/k", "scroll") + " · " + hint("?", "close help"))
 	}
 	return styleStatusBar.Width(m.width).Render(shortHelp(m.tab, m.queue.filtering))
 }

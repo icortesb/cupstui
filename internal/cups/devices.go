@@ -117,11 +117,11 @@ var printerNamePattern = regexp.MustCompile(`^[^\s/#]+$`)
 func ValidatePrinterName(name string) error {
 	switch {
 	case name == "":
-		return fmt.Errorf("hace falta un nombre para la impresora")
+		return fmt.Errorf("a printer name is required")
 	case len(name) > 127:
-		return fmt.Errorf("el nombre no puede pasar de 127 caracteres")
+		return fmt.Errorf("name must be 127 characters or fewer")
 	case !printerNamePattern.MatchString(name):
-		return fmt.Errorf("el nombre no puede tener espacios ni los símbolos / o #")
+		return fmt.Errorf("name cannot contain spaces or the / and # characters")
 	}
 	return nil
 }
@@ -141,7 +141,7 @@ func (c *Client) AddPrinter(ctx context.Context, spec NewPrinterSpec) (err error
 		return &Error{Kind: KindUnknown, Hint: err.Error(), Err: err}
 	}
 	if spec.DeviceURI == "" {
-		return &Error{Kind: KindUnknown, Hint: "hace falta elegir un dispositivo o escribir su URI"}
+		return &Error{Kind: KindUnknown, Hint: "select a device or enter its URI"}
 	}
 
 	defer func() { err = classifyNil(recovered(recover(), err)) }()
@@ -158,6 +158,22 @@ func (c *Client) AddPrinter(ctx context.Context, spec NewPrinterSpec) (err error
 	// Sin esto la impresora queda creada pero detenida y rechazando trabajos.
 	req.PrinterAttributes[ipp.AttributePrinterIsAcceptingJobs] = true
 	req.PrinterAttributes[ipp.AttributePrinterState] = 3 // idle
+
+	_, err = c.adapter.SendRequestContext(ctx, c.adapter.GetHttpUri("admin", nil), req, nil)
+	return err
+}
+
+// DeletePrinter removes a print queue and any jobs still on it.
+func (c *Client) DeletePrinter(ctx context.Context, name string) (err error) {
+	if err := ValidatePrinterName(name); err != nil {
+		return &Error{Kind: KindUnknown, Hint: err.Error(), Err: err}
+	}
+
+	defer func() { err = classifyNil(recovered(recover(), err)) }()
+
+	req := ipp.NewRequest(ipp.OperationCupsDeletePrinter, 1)
+	req.OperationAttributes[ipp.AttributePrinterURI] = printerURI(name)
+	req.OperationAttributes[ipp.AttributeRequestingUserName] = c.user
 
 	_, err = c.adapter.SendRequestContext(ctx, c.adapter.GetHttpUri("admin", nil), req, nil)
 	return err

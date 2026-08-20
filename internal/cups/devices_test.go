@@ -150,3 +150,39 @@ func TestAddPrinterRequiresADeviceURI(t *testing.T) {
 		t.Fatal("quiero un error si falta la URI del dispositivo")
 	}
 }
+
+func TestDeletePrinterSendsDeletePrinterOperation(t *testing.T) {
+	f := &fakeAdapter{}
+	if err := newTestClient(f).DeletePrinter(t.Context(), "Epson_L3150"); err != nil {
+		t.Fatalf("DeletePrinter: %v", err)
+	}
+
+	req := f.sentOperation(ipp.OperationCupsDeletePrinter)
+	if req == nil {
+		t.Fatal("CUPS-Delete-Printer was not sent")
+	}
+	uri, _ := req.OperationAttributes[ipp.AttributePrinterURI].(string)
+	if printerNameFromURI(uri) != "Epson_L3150" {
+		t.Errorf("printer-uri = %q, want it to point at Epson_L3150", uri)
+	}
+}
+
+func TestDeletePrinterRejectsAnEmptyName(t *testing.T) {
+	// An empty name yields the URI of the printer collection rather than of one
+	// printer, and CUPS would answer something unhelpful.
+	f := &fakeAdapter{}
+	if err := newTestClient(f).DeletePrinter(t.Context(), ""); err == nil {
+		t.Fatal("want an error for an empty name")
+	}
+	if f.sentOperation(ipp.OperationCupsDeletePrinter) != nil {
+		t.Error("nothing should be sent when the name is invalid")
+	}
+}
+
+func TestDeletePrinterErrorsAreClassified(t *testing.T) {
+	f := &fakeAdapter{err: ipp.HTTPError{Code: 403}}
+	var cerr *Error
+	if err := newTestClient(f).DeletePrinter(t.Context(), "x"); !asError(err, &cerr) || cerr.Kind != KindForbidden {
+		t.Errorf("want KindForbidden, got %v", err)
+	}
+}

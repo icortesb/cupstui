@@ -35,7 +35,7 @@ func (p printersModel) selected(printers []cups.Printer) (cups.Printer, bool) {
 
 func (p printersModel) view(printers []cups.Printer, width int) string {
 	if len(printers) == 0 {
-		return styleDim.Render("  No hay impresoras configuradas en este CUPS.")
+		return styleDim.Render("  No printers configured on this CUPS server.")
 	}
 
 	var b strings.Builder
@@ -49,10 +49,10 @@ func (p printersModel) view(printers []cups.Printer, width int) string {
 
 		badges := []string{stateBadge(pr)}
 		if pr.IsDefault {
-			badges = append(badges, styleKey.Render("[por omisión]"))
+			badges = append(badges, styleKey.Render("[default]"))
 		}
 		if !pr.Accepting {
-			badges = append(badges, styleWarnText.Render("[rechaza trabajos]"))
+			badges = append(badges, styleWarnText.Render("[rejecting jobs]"))
 		}
 
 		fmt.Fprintf(&b, "%s%s  %s\n", cursor, name, strings.Join(badges, " "))

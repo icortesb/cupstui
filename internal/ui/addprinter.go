@@ -61,10 +61,10 @@ func newAdd() addModel {
 	}
 	a := addModel{
 		uri:       mk("socket://192.168.0.50:9100", 200),
-		ppdFilter: mk("filtrar drivers por modelo", 60),
-		name:      mk("sin espacios ni / ni #", 127),
-		info:      mk("descripción (opcional)", 100),
-		location:  mk("ubicación (opcional)", 100),
+		ppdFilter: mk("filter drivers by model", 60),
+		name:      mk("no spaces, / or #", 127),
+		info:      mk("description (optional)", 100),
+		location:  mk("location (optional)", 100),
 	}
 	a.restyle()
 	return a
@@ -325,8 +325,8 @@ func clampIndex(i, n int) int {
 
 func (a addModel) view() string {
 	var b strings.Builder
-	b.WriteString(styleBold.Render("  Agregar impresora"))
-	b.WriteString(styleDim.Render("   paso " + fmt.Sprint(int(a.step)+1) + " de 4 · esc vuelve"))
+	b.WriteString(styleBold.Render("  Add printer"))
+	b.WriteString(styleDim.Render("   step " + fmt.Sprint(int(a.step)+1) + " of 4 · esc back"))
 	b.WriteString("\n\n")
 
 	if a.err != nil {
@@ -337,8 +337,8 @@ func (a addModel) view() string {
 	case stepDevice:
 		b.WriteString(a.deviceView())
 	case stepURI:
-		b.WriteString("  " + styleLabel.Render("URI del dispositivo") + "\n  " + a.uri.View() + "\n\n")
-		b.WriteString(styleDim.Render("  Por ejemplo socket://192.168.0.50:9100, ipp://host/ipp/print o usb://…"))
+		b.WriteString("  " + styleLabel.Render("Device URI") + "\n  " + a.uri.View() + "\n\n")
+		b.WriteString(styleDim.Render("  For example socket://192.168.0.50:9100, ipp://host/ipp/print or usb://…"))
 	case stepDriver:
 		b.WriteString(a.driverView())
 	case stepDetails:
@@ -349,7 +349,7 @@ func (a addModel) view() string {
 
 func (a addModel) deviceView() string {
 	if a.loading {
-		return styleDim.Render("  Explorando USB y red… (CUPS puede tardar unos segundos)")
+		return styleDim.Render("  Scanning USB and network… this can take a few seconds")
 	}
 
 	var b strings.Builder
@@ -357,7 +357,7 @@ func (a addModel) deviceView() string {
 	start := scrollStart(a.devCursor, a.deviceCount(), rows)
 
 	for i := start; i < a.deviceCount() && i < start+rows; i++ {
-		label := styleDim.Render("Escribir la URI a mano…")
+		label := styleDim.Render("Enter a URI manually…")
 		if i < len(a.devices) {
 			d := a.devices[i]
 			name := d.MakeModel
@@ -373,15 +373,15 @@ func (a addModel) deviceView() string {
 
 func (a addModel) driverView() string {
 	var b strings.Builder
-	b.WriteString("  " + styleLabel.Render("Buscar driver: ") + a.ppdFilter.View() + "\n\n")
+	b.WriteString("  " + styleLabel.Render("Search drivers: ") + a.ppdFilter.View() + "\n\n")
 
 	rows := a.listRows() - 2
 	total := len(a.matches) + 1
 	start := scrollStart(a.ppdCursor, total, rows)
 
 	for i := start; i < total && i < start+rows; i++ {
-		label := styleValue.Render("Sin driver — IPP Everywhere") +
-			styleDim.Render("  (impresoras modernas que se describen solas)")
+		label := styleValue.Render("No driver — IPP Everywhere") +
+			styleDim.Render("  (for printers that describe themselves)")
 		if i > 0 {
 			label = styleValue.Render(truncate(a.matches[i-1].MakeModel, a.width-8))
 		}
@@ -389,7 +389,7 @@ func (a addModel) driverView() string {
 	}
 
 	if len(a.matches) == 0 {
-		b.WriteString("\n" + styleDim.Render("  Ningún driver coincide; probá con menos palabras o seguí sin driver."))
+		b.WriteString("\n" + styleDim.Render("  No driver matches. Try fewer words, or continue without one."))
 	}
 	return b.String()
 }
@@ -399,9 +399,9 @@ func (a addModel) detailsView() string {
 		label string
 		input textinput.Model
 	}{
-		{"Nombre", a.name},
-		{"Descripción", a.info},
-		{"Ubicación", a.location},
+		{"Name", a.name},
+		{"Description", a.info},
+		{"Location", a.location},
 	}
 
 	var b strings.Builder
@@ -416,9 +416,9 @@ func (a addModel) detailsView() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(styleDim.Render("  Dispositivo: ") + styleValue.Render(truncate(a.chosenURI, a.width-18)) + "\n")
-	b.WriteString(styleDim.Render("  Driver:      ") + styleValue.Render(a.chosenPPD) + "\n\n")
-	b.WriteString(styleDim.Render("  enter crea la impresora"))
+	b.WriteString(styleDim.Render("  Device: ") + styleValue.Render(truncate(a.chosenURI, a.width-18)) + "\n")
+	b.WriteString(styleDim.Render("  Driver: ") + styleValue.Render(a.chosenPPD) + "\n\n")
+	b.WriteString(styleDim.Render("  enter to create"))
 	return b.String()
 }
 

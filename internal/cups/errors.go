@@ -52,7 +52,7 @@ func classify(err error) *Error {
 	if isDaemonDown(err) {
 		return &Error{
 			Kind: KindDaemonDown,
-			Hint: "CUPS no responde — probá: systemctl start cups",
+			Hint: "CUPS is not responding — try: systemctl start cups",
 			Err:  err,
 		}
 	}
@@ -68,18 +68,18 @@ func classify(err error) *Error {
 		case ippForbidden, ippNotAuthenticated, ippNotAuthorized:
 			return &Error{Kind: KindForbidden, Hint: permissionHint, Err: err}
 		case ippNotFound:
-			return &Error{Kind: KindNotFound, Hint: "la impresora o el trabajo ya no existe", Err: err}
+			return &Error{Kind: KindNotFound, Hint: "the printer or job no longer exists", Err: err}
 		}
 	}
 
 	if ipp.IsNotExistsError(err) {
-		return &Error{Kind: KindNotFound, Hint: "la impresora o el trabajo ya no existe", Err: err}
+		return &Error{Kind: KindNotFound, Hint: "the printer or job no longer exists", Err: err}
 	}
 
 	return &Error{Kind: KindUnknown, Hint: err.Error(), Err: err}
 }
 
-const permissionHint = "sin permisos para esta operación (hace falta estar en el grupo del SystemGroup de CUPS, normalmente wheel)"
+const permissionHint = "permission denied — this operation requires membership in the CUPS SystemGroup (usually wheel)"
 
 func isDaemonDown(err error) bool {
 	if errors.Is(err, ipp.SocketNotFoundError) {

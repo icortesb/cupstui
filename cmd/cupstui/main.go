@@ -15,7 +15,7 @@ import (
 
 func main() {
 	transparent := flag.Bool("transparent", false,
-		"no pintar fondo propio y dejar ver el del terminal (puede afectar la legibilidad)")
+		"do not paint a background; let the terminal show through")
 	flag.Parse()
 
 	// La preferencia guardada manda, salvo que se pase el flag explícitamente.
@@ -30,7 +30,7 @@ func main() {
 
 	client, err := cups.New()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "no se pudo iniciar el cliente de CUPS:", err)
+		fmt.Fprintln(os.Stderr, "could not start the CUPS client:", err)
 		os.Exit(1)
 	}
 

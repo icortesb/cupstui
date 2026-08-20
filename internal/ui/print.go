@@ -27,7 +27,7 @@ const (
 )
 
 var fieldLabels = [fieldCount]string{
-	"Archivo", "Impresora", "Copias", "Páginas", "Dúplex", "Color", "Orientación",
+	"File", "Printer", "Copies", "Pages", "Duplex", "Color", "Orientation",
 }
 
 // printModel es el formulario para mandar un archivo a imprimir.
@@ -51,12 +51,12 @@ type printModel struct {
 func newPrint() printModel {
 	path := textinput.New()
 	path.Prompt = ""
-	path.Placeholder = "ruta del archivo (ctrl+o para buscar)"
+	path.Placeholder = "file path — ctrl+o to browse"
 	path.CharLimit = 300
 
 	ranges := textinput.New()
 	ranges.Prompt = ""
-	ranges.Placeholder = "todas (ej: 1-5,8)"
+	ranges.Placeholder = "all (e.g. 1-5,8)"
 	ranges.CharLimit = 40
 
 	fp := filepicker.New()
@@ -213,8 +213,8 @@ func (p printModel) view(printers []cups.Printer, defaultPrinter string) string 
 		if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(dir, home) {
 			dir = "~" + strings.TrimPrefix(dir, home)
 		}
-		header := "  " + styleLabel.Render("En ") + styleValue.Render(truncate(dir, p.width-8))
-		hints := "  " + styleDim.Render("j/k mover · l o → entrar · h o ← subir · enter elegir · esc cancelar")
+		header := "  " + styleLabel.Render("In ") + styleValue.Render(truncate(dir, p.width-8))
+		hints := "  " + styleDim.Render("j/k move · l or → open · h or ← up · enter select · esc cancel")
 		return strings.Join([]string{header, hints, "", p.picker.View()}, "\n")
 	}
 
@@ -230,7 +230,7 @@ func (p printModel) view(printers []cups.Printer, defaultPrinter string) string 
 	}
 
 	b.WriteString("\n")
-	b.WriteString(styleDim.Render("  ←/→ cambia el valor · ctrl+o busca un archivo · enter imprime"))
+	b.WriteString(styleDim.Render("  ←/→ change value · ctrl+o browse · enter print"))
 	return b.String()
 }
 
@@ -242,9 +242,9 @@ func (p printModel) valueOf(field int, printers []cups.Printer, defaultPrinter s
 		if p.printer < 0 || p.printer >= len(printers) {
 			name := defaultPrinter
 			if name == "" {
-				name = "ninguna configurada"
+				name = "none configured"
 			}
-			return styleValue.Render(name) + styleDim.Render("  (por omisión)")
+			return styleValue.Render(name) + styleDim.Render("  (default)")
 		}
 		return styleValue.Render(printers[p.printer].Name)
 	case fieldCopies:

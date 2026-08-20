@@ -25,21 +25,21 @@ const (
 func (s JobState) String() string {
 	switch s {
 	case JobPending:
-		return "en espera"
+		return "pending"
 	case JobHeld:
-		return "retenido"
+		return "held"
 	case JobProcessing:
-		return "imprimiendo"
+		return "printing"
 	case JobStopped:
-		return "detenido"
+		return "stopped"
 	case JobCanceled:
-		return "cancelado"
+		return "canceled"
 	case JobAborted:
-		return "abortado"
+		return "aborted"
 	case JobCompleted:
-		return "completado"
+		return "completed"
 	default:
-		return "desconocido"
+		return "unknown"
 	}
 }
 
