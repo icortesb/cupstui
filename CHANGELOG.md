@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.1 — 2026-08-20
+
+- The row under the cursor in the queue and history tables no longer starts one
+  column to the right of the header, so the table stays still as the cursor
+  moves.
+- The README opens on a recording of the interface instead of two hand-drawn
+  screens.
+
 ## v0.1.0 — 2026-08-20
 
 First public version.
