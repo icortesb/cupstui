@@ -37,6 +37,7 @@ type Printer struct {
 	Reasons      []string
 	Accepting    bool
 	IsDefault    bool
+	Policy       Policy
 }
 
 func printerFromAttributes(name string, a ipp.Attributes) Printer {
@@ -57,6 +58,14 @@ func printerFromAttributes(name string, a ipp.Attributes) Printer {
 		p.State = StatePrinting
 	case 5:
 		p.State = StateStopped
+	}
+
+	p.Policy = Policy{
+		PageLimit:    attrInt(a, "job-page-limit"),
+		KLimit:       attrInt(a, "job-k-limit"),
+		QuotaDays:    attrInt(a, "job-quota-period") / secondsPerDay,
+		AllowedUsers: attrStrings(a, "requesting-user-name-allowed"),
+		DeniedUsers:  attrStrings(a, "requesting-user-name-denied"),
 	}
 
 	for _, r := range attrStrings(a, "printer-state-reasons") {

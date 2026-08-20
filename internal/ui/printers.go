@@ -67,6 +67,9 @@ func (p printersModel) view(printers []cups.Printer, width int) string {
 		if pr.DeviceURI != "" {
 			fmt.Fprintf(&b, "    %s\n", styleDim.Render(truncate(pr.DeviceURI, width-6)))
 		}
+		if summary := pr.Policy.Summary(); summary != "no limits" {
+			fmt.Fprintf(&b, "    %s\n", styleDim.Render(truncate("quotas: "+summary, width-6)))
+		}
 		if msg := problemLine(pr); msg != "" {
 			fmt.Fprintf(&b, "    %s\n", styleWarnText.Render(truncate(msg, width-6)))
 		}

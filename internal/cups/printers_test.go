@@ -91,3 +91,12 @@ func TestPrinterReasonsIgnoresNone(t *testing.T) {
 		t.Errorf("Reasons = %v, quiero %v", p.Reasons, want)
 	}
 }
+
+// ipAttrs builds a multi-valued attribute, the shape CUPS uses for user lists.
+func ipAttrs(key string, values ...string) ipp.Attributes {
+	a := ipp.Attributes{}
+	for _, v := range values {
+		a[key] = append(a[key], ipp.Attribute{Name: key, Value: v})
+	}
+	return a
+}

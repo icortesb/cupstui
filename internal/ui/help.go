@@ -15,15 +15,16 @@ type helpSection struct {
 
 func helpView(width int) string {
 	sections := []helpSection{
-		{"Navigation", []key.Binding{keys.Down, keys.NextTab, keys.PrevTab, keys.Tab1, keys.Tab2, keys.Tab3, keys.Tab4, keys.Tab5}},
+		{"Navigation", []key.Binding{keys.Down, keys.NextTab, keys.PrevTab, keys.Tab1, keys.Tab2, keys.Tab3, keys.Tab4, keys.Tab5, keys.Tab6}},
 		{"Queue", []key.Binding{keys.HoldJob, keys.Cancel, keys.CancelAll, keys.Filter}},
-		{"Printers", []key.Binding{keys.Toggle, keys.Default, keys.Accepting, keys.AddPrinter, keys.DeletePrinter}},
+		{"Printers", []key.Binding{keys.Toggle, keys.Default, keys.Accepting, keys.AddPrinter, keys.DeletePrinter, keys.Policy}},
 		{"Print", []key.Binding{
 			key.NewBinding(key.WithKeys("down"), key.WithHelp("↑↓ j/k", "change field")),
 			key.NewBinding(key.WithKeys("left"), key.WithHelp("←→ h/l", "change value")),
 			key.NewBinding(key.WithKeys("ctrl+o"), key.WithHelp("ctrl+o", "browse files")),
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "print")),
 		}},
+		{"History", []key.Binding{keys.Filter, keys.Export}},
 		{"Logs", []key.Binding{keys.NextLog}},
 		{"General", []key.Binding{keys.Refresh, keys.Transparent, keys.Escape, keys.Help, keys.Quit}},
 	}
@@ -89,10 +90,12 @@ func shortHelp(t tab, filtering bool) string {
 		return hint("j/k", "move") + " · " + hint("p", "hold") + " · " + hint("x", "cancel") + " · " + hint("X", "all") + " · " + hint("/", "filter") + " · " + common
 	case tabPrint:
 		return hint("↑↓", "field") + " · " + hint("←→", "value") + " · " + hint("ctrl+o", "browse") + " · " + hint("enter", "print") + " · " + hint("tab", "switch tab")
+	case tabHistory:
+		return hint("j/k", "move") + " · " + hint("/", "filter") + " · " + hint("E", "export CSV") + " · " + common
 	case tabLogs:
 		return hint("j/k", "scroll") + " · " + hint("G", "jump to end") + " · " + hint("n", "next log") + " · " + common
 	case tabPrinters:
-		return hint("j/k", "move") + " · " + hint("e", "enable") + " · " + hint("d", "default") + " · " + hint("a", "accept") + " · " + hint("A", "add") + " · " + hint("x", "remove") + " · " + common
+		return hint("j/k", "move") + " · " + hint("e", "enable") + " · " + hint("d", "default") + " · " + hint("a", "accept") + " · " + hint("A", "add") + " · " + hint("x", "remove") + " · " + hint("u", "quotas") + " · " + common
 	default:
 		return common
 	}

@@ -81,6 +81,11 @@ var printerAttributes = []string{
 	"printer-location",
 	"printer-make-and-model",
 	"device-uri",
+	"job-page-limit",
+	"job-k-limit",
+	"job-quota-period",
+	"requesting-user-name-allowed",
+	"requesting-user-name-denied",
 }
 
 var jobAttributes = []string{

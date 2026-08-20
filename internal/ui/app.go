@@ -32,10 +32,11 @@ const (
 	tabQueue
 	tabPrinters
 	tabPrint
+	tabHistory
 	tabLogs
 )
 
-var tabNames = []string{"Dashboard", "Queue", "Printers", "Print", "Logs"}
+var tabNames = []string{"Dashboard", "Queue", "Printers", "Print", "History", "Logs"}
 
 type (
 	tickMsg     time.Time
@@ -52,6 +53,10 @@ type (
 	statusMsg struct {
 		text string
 		err  error
+	}
+	historyMsg struct {
+		entries []cups.HistoryEntry
+		err     error
 	}
 	logsMsg struct {
 		lines []string
@@ -90,8 +95,10 @@ type Model struct {
 	queue    queueModel
 	printers printersModel
 	print    printModel
+	history  historyModel
 	logs     logsModel
 	add      addModel
+	policy   policyModel
 
 	confirm     *confirmation
 	helpVP      viewport.Model
@@ -105,14 +112,16 @@ type Model struct {
 // New arma el modelo raíz con un cliente ya conectado.
 func New(c *cups.Client) Model {
 	return Model{
-		client: c,
-		queue:  newQueue(),
-		print:  newPrint(),
-		logs:   newLogs(),
-		add:    newAdd(),
-		helpVP: viewport.New(80, 10),
-		width:  80,
-		height: 24,
+		client:  c,
+		queue:   newQueue(),
+		print:   newPrint(),
+		history: newHistory(),
+		logs:    newLogs(),
+		add:     newAdd(),
+		policy:  newPolicy(),
+		helpVP:  viewport.New(80, 10),
+		width:   80,
+		height:  24,
 	}
 }
 
@@ -157,6 +166,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tab == tabLogs {
 			cmds = append(cmds, readLog(m.logs.current()))
 		}
+		if m.tab == tabHistory {
+			cmds = append(cmds, readHistory())
+		}
 		if !m.refreshing {
 			m.refreshing = true
 			cmds = append(cmds, m.refresh())
@@ -196,6 +208,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.setStatus(msg.text, false)
 		}
+		return m, nil
+
+	case historyMsg:
+		m.history.setEntries(msg.entries, msg.err)
 		return m, nil
 
 	case logsMsg:
@@ -256,6 +272,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.add.handleKey(msg, m.client)
 	}
 
+	// The quota editor likewise: it is all text fields.
+	if m.policy.active {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, m.policy.handleKey(msg)
+	}
+
 	// tab y shift+tab quedan siempre para cambiar de pestaña: en el formulario
 	// las flechas ←/→ cambian el valor del campo, así que sin esto no habría
 	// forma evidente de salir de la pantalla.
@@ -284,6 +308,23 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if formKeys[msg.String()] {
 			return m.handlePrintKey(msg)
 		}
+	}
+
+	// While the history filter is being typed, the text field takes the keys.
+	if m.tab == tabHistory && m.history.filtering {
+		switch msg.String() {
+		case "enter":
+			m.history.stopFiltering(false)
+			return m, nil
+		case "esc":
+			m.history.stopFiltering(true)
+			m.history.apply()
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.history.filter, cmd = m.history.filter.Update(msg)
+		m.history.apply()
+		return m, cmd
 	}
 
 	// Mientras se escribe el filtro, el campo de texto tiene prioridad.
@@ -352,6 +393,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.tab = tabPrint
 		return m, nil
 	case key.Matches(msg, keys.Tab5):
+		return m.goTo(tabHistory)
+	case key.Matches(msg, keys.Tab6):
 		return m.goTo(tabLogs)
 
 	case key.Matches(msg, keys.NextTab):
@@ -375,10 +418,30 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handlePrintersKey(msg)
 	case tabPrint:
 		return m.handlePrintKey(msg)
+	case tabHistory:
+		return m.handleHistoryKey(msg)
 	case tabLogs:
 		return m.handleLogsKey(msg)
 	}
 	return m, nil
+}
+
+func (m Model) handleHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keys.Filter):
+		return m, m.history.startFiltering()
+
+	case key.Matches(msg, keys.Export):
+		if len(m.history.visible) == 0 {
+			m.setStatus("Nothing to export.", true)
+			return m, nil
+		}
+		return m, exportHistory(m.history.visible)
+	}
+
+	var cmd tea.Cmd
+	m.history.table, cmd = m.history.table.Update(msg)
+	return m, cmd
 }
 
 func (m Model) handlePrintKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -472,8 +535,11 @@ func (m Model) submitPrint() (tea.Model, tea.Cmd) {
 // goTo cambia de pestaña y dispara la carga que esa pestaña necesite.
 func (m Model) goTo(t tab) (tea.Model, tea.Cmd) {
 	m.tab = t
-	if t == tabLogs {
+	switch t {
+	case tabLogs:
 		return m, readLog(m.logs.current())
+	case tabHistory:
+		return m, readHistory()
 	}
 	return m, nil
 }
@@ -579,6 +645,9 @@ func (m Model) handlePrintersKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.AddPrinter):
 		return m, m.add.start(m.client)
 
+	case key.Matches(msg, keys.Policy):
+		return m, m.policy.start(p)
+
 	case key.Matches(msg, keys.DeletePrinter):
 		c := m.client
 		queued := jobsFor(m.snap.Jobs, p.Name)
@@ -632,7 +701,9 @@ func (m *Model) resize() {
 	m.queue.setSize(m.width, body-2)
 	m.logs.setSize(m.width, body-2)
 	m.print.setSize(m.width, body-2)
+	m.history.setSize(m.width, body-2)
 	m.add.setSize(m.width, body)
+	m.policy.setSize(m.width)
 	m.helpVP.Width = m.width
 	m.helpVP.Height = body
 	m.helpVP.SetContent(helpView(m.width))
@@ -656,8 +727,10 @@ func rememberTransparency(on bool) tea.Cmd {
 // al construirse. Hace falta al cambiar el modo transparente en caliente.
 func (m *Model) restyle() {
 	m.queue.restyle()
+	m.history.restyle()
 	m.print.restyle()
 	m.add.restyle()
+	m.policy.restyle()
 	m.helpVP.SetContent(helpView(m.width))
 }
 
@@ -741,6 +814,9 @@ func (m Model) bodyView() string {
 	if m.add.active {
 		return m.add.view()
 	}
+	if m.policy.active {
+		return m.policy.view()
+	}
 	if m.showHelp {
 		return m.helpVP.View()
 	}
@@ -758,6 +834,8 @@ func (m Model) bodyView() string {
 		return m.printers.view(m.snap.Printers, m.width)
 	case tabPrint:
 		return m.print.view(m.snap.Printers, m.snap.Default)
+	case tabHistory:
+		return m.history.view()
 	case tabLogs:
 		return m.logs.view(m.width)
 	default:
@@ -781,5 +859,6 @@ func (m Model) footerView() string {
 		return styleStatusBar.Width(m.width).Render(
 			hint("j/k", "scroll") + " · " + hint("?", "close help"))
 	}
-	return styleStatusBar.Width(m.width).Render(shortHelp(m.tab, m.queue.filtering))
+	return styleStatusBar.Width(m.width).Render(
+		shortHelp(m.tab, m.queue.filtering || m.history.filtering))
 }

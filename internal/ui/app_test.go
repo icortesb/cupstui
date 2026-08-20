@@ -32,6 +32,8 @@ func testModel() Model {
 	m.logs.setSize(m.width, 10)
 	m.print.setSize(m.width, 10)
 	m.add.setSize(m.width, 10)
+	m.history.setSize(m.width, 10)
+	m.policy.setSize(m.width)
 	return m
 }
 
@@ -76,6 +78,20 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 			m.add.active = true
 			m.add.step = stepDriver
 			m.add.matches = []cups.PPD{{Name: "a.ppd", MakeModel: "EPSON L3150 Series"}}
+		}},
+		{"history", func(m *Model) {
+			m.tab = tabHistory
+			m.history.setEntries([]cups.HistoryEntry{
+				{Printer: "Epson_L3150", User: "icortes", JobID: 7, Pages: 3,
+					Document: "report.pdf", When: time.Now()},
+			}, nil)
+		}},
+		{"history sin permisos", func(m *Model) {
+			m.tab = tabHistory
+			m.history.setEntries(nil, &cups.Error{Kind: cups.KindForbidden, Hint: "denied"})
+		}},
+		{"quotas", func(m *Model) {
+			m.policy.start(m.snap.Printers[0])
 		}},
 		{"alta: datos", func(m *Model) {
 			m.add.active = true
@@ -201,14 +217,14 @@ func TestTabSwitchesTabsEvenWhileEditingThePrintForm(t *testing.T) {
 	m.print.applyFocus()
 
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
-	if got := next.(Model).tab; got != tabLogs {
-		t.Errorf("tab desde Imprimir fue a %v, quiero tabLogs", got)
+	if got := next.(Model).tab; got != tabPrint+1 {
+		t.Errorf("tab desde Imprimir fue a %v, quiero la siguiente pestaña", got)
 	}
 
 	m.tab = tabPrint
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
-	if got := next.(Model).tab; got != tabPrinters {
-		t.Errorf("shift+tab desde Imprimir fue a %v, quiero tabPrinters", got)
+	if got := next.(Model).tab; got != tabPrint-1 {
+		t.Errorf("shift+tab desde Imprimir fue a %v, quiero la anterior", got)
 	}
 }
 

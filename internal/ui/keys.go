@@ -12,6 +12,8 @@ type keyMap struct {
 	Tab3          key.Binding
 	Tab4          key.Binding
 	Tab5          key.Binding
+	Tab6          key.Binding
+	Export        key.Binding
 	NextLog       key.Binding
 	Filter        key.Binding
 	Refresh       key.Binding
@@ -23,6 +25,7 @@ type keyMap struct {
 	Accepting     key.Binding
 	AddPrinter    key.Binding
 	DeletePrinter key.Binding
+	Policy        key.Binding
 	Help          key.Binding
 	Transparent   key.Binding
 	Escape        key.Binding
@@ -38,7 +41,9 @@ var keys = keyMap{
 	Tab2:          key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "queue")),
 	Tab3:          key.NewBinding(key.WithKeys("3"), key.WithHelp("3", "printers")),
 	Tab4:          key.NewBinding(key.WithKeys("4"), key.WithHelp("4", "print")),
-	Tab5:          key.NewBinding(key.WithKeys("5"), key.WithHelp("5", "logs")),
+	Tab5:          key.NewBinding(key.WithKeys("5"), key.WithHelp("5", "history")),
+	Tab6:          key.NewBinding(key.WithKeys("6"), key.WithHelp("6", "logs")),
+	Export:        key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "export CSV")),
 	NextLog:       key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next log")),
 	Filter:        key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 	Refresh:       key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh now")),
@@ -50,6 +55,7 @@ var keys = keyMap{
 	Accepting:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "accept/reject jobs")),
 	AddPrinter:    key.NewBinding(key.WithKeys("A", "+"), key.WithHelp("A", "add printer")),
 	DeletePrinter: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "remove printer")),
+	Policy:        key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "quotas and access")),
 	Help:          key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 	Transparent:   key.NewBinding(key.WithKeys("T"), key.WithHelp("T", "toggle transparent background")),
 	Escape:        key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
