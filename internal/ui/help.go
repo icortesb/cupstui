@@ -79,7 +79,7 @@ func pad(s string, n int) string {
 	return s
 }
 
-// shortHelp es la línea de atajos del pie, distinta según la pestaña.
+// shortHelp is the footer line of shortcuts, different for each tab.
 func shortHelp(t tab, filtering bool) string {
 	if filtering {
 		return hint("enter", "apply") + " · " + hint("esc", "clear filter")

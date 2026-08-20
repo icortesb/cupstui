@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
 // Fields of the quota editor, in the order they are visited.

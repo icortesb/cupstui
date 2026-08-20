@@ -8,7 +8,7 @@ import (
 	ipp "github.com/phin1x/go-ipp"
 )
 
-// JobState es el job-state de IPP (RFC 8011 §5.3.7).
+// JobState is the IPP job-state (RFC 8011 §5.3.7).
 type JobState int
 
 const (
@@ -43,7 +43,7 @@ func (s JobState) String() string {
 	}
 }
 
-// Job es un trabajo de impresión en la cola.
+// Job is a print job on the queue.
 type Job struct {
 	ID      int
 	Name    string
@@ -111,7 +111,7 @@ func jobFromAttributes(id int, a ipp.Attributes) Job {
 	return j
 }
 
-// printerNameFromURI saca "Epson_L3150" de "ipp://localhost/printers/Epson_L3150".
+// printerNameFromURI takes "Epson_L3150" out of "ipp://localhost/printers/Epson_L3150".
 func printerNameFromURI(uri string) string {
 	if uri == "" {
 		return ""
@@ -119,7 +119,7 @@ func printerNameFromURI(uri string) string {
 	return uri[strings.LastIndex(uri, "/")+1:]
 }
 
-// sortJobs deja los trabajos más nuevos arriba.
+// sortJobs puts the newest jobs on top.
 func sortJobs(jobs []Job) {
 	sort.Slice(jobs, func(i, j int) bool { return jobs[i].ID > jobs[j].ID })
 }

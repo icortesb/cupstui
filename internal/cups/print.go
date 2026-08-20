@@ -12,17 +12,17 @@ import (
 	"strings"
 )
 
-// El envío de trabajos se hace con lp y no por IPP, al revés que el resto del
-// paquete. La librería IPP disponible manda copies dos veces (pone su propio
-// valor por omisión además del pedido), no sabe codificar page-ranges como
-// rangeOfInteger —lo manda como texto, que el filtro puede ignorar sin avisar—
-// y el trabajo termina atribuido a root en vez de al usuario real. lp resuelve
-// los tres casos porque conoce el tipo de cada opción.
+// Jobs are submitted with lp rather than over IPP, unlike the rest of this
+// package. The IPP library available here sends copies twice (it adds its own
+// default alongside the requested value), cannot encode page-ranges as a
+// rangeOfInteger — it sends text, which the filter may ignore without saying so
+// — and the job ends up attributed to root instead of the real user. lp gets
+// all three right because it knows the type of each option.
 //
-// Verificado contra CUPS 2.4.19 comparando los atributos que quedan guardados
-// en el trabajo por una vía y por la otra.
+// Verified against CUPS 2.4.19 by comparing the attributes each route leaves
+// stored on the job.
 
-// Duplex es la impresión a dos caras.
+// Duplex is two-sided printing.
 type Duplex int
 
 const (
@@ -58,7 +58,7 @@ func (d Duplex) value() string {
 	}
 }
 
-// ColorMode elige entre color y blanco y negro.
+// ColorMode chooses between colour and black and white.
 type ColorMode int
 
 const (
@@ -89,7 +89,7 @@ func (c ColorMode) value() string {
 	}
 }
 
-// Orientation es la orientación del papel.
+// Orientation is how the page is laid out.
 type Orientation int
 
 const (
@@ -109,7 +109,7 @@ func (o Orientation) String() string {
 	}
 }
 
-// value es el enum orientation-requested de IPP (3 vertical, 4 horizontal).
+// value is the IPP orientation-requested enum (3 portrait, 4 landscape).
 func (o Orientation) value() string {
 	switch o {
 	case OrientationPortrait:
@@ -121,8 +121,8 @@ func (o Orientation) value() string {
 	}
 }
 
-// PrintOptions son las opciones de un trabajo nuevo. El cero de cada campo
-// significa "lo que tenga configurado la impresora".
+// PrintOptions are the options of a new job. The zero value of each field
+// means whatever the printer is configured for.
 type PrintOptions struct {
 	Printer     string
 	Copies      int
@@ -135,7 +135,7 @@ type PrintOptions struct {
 
 const maxCopies = 999
 
-// pageRangePattern acepta las formas que entiende CUPS: 1, 1-5, 2,4,6-8.
+// pageRangePattern accepts the forms CUPS understands: 1, 1-5, 2,4,6-8.
 var pageRangePattern = regexp.MustCompile(`^\d+(-\d+)?(,\d+(-\d+)?)*$`)
 
 func (o PrintOptions) validate() error {
@@ -173,9 +173,9 @@ func validatePageRanges(ranges string) error {
 	return nil
 }
 
-// lpArgs arma los argumentos de lp. Se devuelven como lista y se ejecutan sin
-// intérprete de comandos, así un nombre de archivo con espacios o comillas no
-// puede convertirse en otra cosa.
+// lpArgs builds the arguments for lp. They are returned as a list and run
+// without a shell, so a file name holding spaces or quotes cannot turn into
+// something else.
 func lpArgs(path string, o PrintOptions) ([]string, error) {
 	if err := o.validate(); err != nil {
 		return nil, err
@@ -201,15 +201,15 @@ func lpArgs(path string, o PrintOptions) ([]string, error) {
 	}
 
 	args = append(args, "-t", filepath.Base(path))
-	// El "--" evita que un archivo cuyo nombre empiece con guion se interprete
-	// como una opción más.
+	// The "--" stops a file whose name begins with a dash from being read as
+	// one more option.
 	return append(args, "--", path), nil
 }
 
-// jobIDPattern extrae el número de "request id is Epson_L3150-42 (1 file(s))".
+// jobIDPattern pulls the number out of "request id is Epson_L3150-42 (1 file(s))".
 var jobIDPattern = regexp.MustCompile(`-(\d+)\s`)
 
-// Submit manda un archivo a imprimir y devuelve el id del trabajo.
+// Submit sends a file to print and returns the job id.
 func Submit(path string, o PrintOptions) (int, error) {
 	if fi, err := os.Stat(path); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -241,17 +241,17 @@ func Submit(path string, o PrintOptions) (int, error) {
 		id, _ := strconv.Atoi(m[1])
 		return id, nil
 	}
-	return 0, nil // aceptado, pero sin id reconocible en la salida
+	return 0, nil // accepted, but the output held no id we recognise
 }
 
-// lpError se queda con la salida de lp, que explica el problema mejor que el
-// código de salida.
+// lpError keeps the output of lp, which explains the problem better than the
+// exit code does.
 func lpError(out []byte, err error) string {
 	msg := strings.TrimSpace(string(out))
 	if msg == "" {
 		return err.Error()
 	}
-	// lp antepone su propio nombre a cada línea; sobra en la UI.
+	// lp prefixes each line with its own name, which is noise here.
 	msg = strings.TrimPrefix(msg, "lp: ")
 	if i := strings.IndexByte(msg, '\n'); i > 0 {
 		msg = msg[:i]

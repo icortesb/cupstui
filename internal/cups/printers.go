@@ -2,7 +2,7 @@ package cups
 
 import ipp "github.com/phin1x/go-ipp"
 
-// PrinterState es el printer-state de IPP (RFC 8011 §5.4.11) normalizado.
+// PrinterState is the IPP printer-state (RFC 8011 §5.4.11), normalised.
 type PrinterState int
 
 const (
@@ -25,7 +25,7 @@ func (s PrinterState) String() string {
 	}
 }
 
-// Printer es una impresora de CUPS tal como la muestra la UI.
+// Printer is a CUPS printer as the interface shows it.
 type Printer struct {
 	Name         string
 	Info         string
@@ -69,7 +69,7 @@ func printerFromAttributes(name string, a ipp.Attributes) Printer {
 	}
 
 	for _, r := range attrStrings(a, "printer-state-reasons") {
-		// CUPS manda "none" cuando no hay nada que reportar.
+		// CUPS sends "none" when there is nothing to report.
 		if r != "" && r != "none" {
 			p.Reasons = append(p.Reasons, r)
 		}

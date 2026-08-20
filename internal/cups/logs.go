@@ -7,26 +7,26 @@ import (
 	"strings"
 )
 
-// LogFile es uno de los registros que escribe cupsd.
+// LogFile is one of the logs cupsd writes.
 type LogFile struct {
 	Name string
 	Path string
 	Desc string
 }
 
-// LogFiles son los registros estándar de CUPS. Las rutas son las de la
-// configuración por omisión; si alguna no existe, la UI lo informa.
+// LogFiles are the standard CUPS logs. The paths are the default ones; if one
+// is missing, the interface says so.
 var LogFiles = []LogFile{
 	{Name: "error_log", Path: "/var/log/cups/error_log", Desc: "daemon errors and warnings"},
 	{Name: "access_log", Path: "/var/log/cups/access_log", Desc: "HTTP/IPP requests served"},
 	{Name: "page_log", Path: "/var/log/cups/page_log", Desc: "pages printed per job"},
 }
 
-// tailWindow es cuánto se lee desde el final del archivo. El error_log crece
-// sin límite, así que se lee una ventana y no el archivo entero.
+// tailWindow is how much is read from the end of the file. error_log grows
+// without bound, so a window is read rather than the whole file.
 const tailWindow int64 = 256 * 1024
 
-// Tail devuelve las últimas n líneas del archivo.
+// Tail returns the last n lines of the file.
 func Tail(path string, n int) ([]string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -47,8 +47,8 @@ func Tail(path string, n int) ([]string, error) {
 
 	buf := make([]byte, size-offset)
 	if _, err := f.ReadAt(buf, offset); err != nil && !errors.Is(err, os.ErrClosed) {
-		// ReadAt devuelve io.EOF si el archivo se acortó entre el Stat y la
-		// lectura; lo leído hasta ahí sigue sirviendo.
+		// ReadAt returns io.EOF if the file shrank between the Stat and the
+		// read; what was read up to there is still good.
 		if len(buf) == 0 {
 			return nil, classifyFileError(err)
 		}
@@ -59,7 +59,7 @@ func Tail(path string, n int) ([]string, error) {
 		return nil, nil
 	}
 
-	// Si se empezó a leer por el medio, la primera línea puede estar cortada.
+	// When reading started mid-file, the first line may be cut in half.
 	if offset > 0 && len(lines) > 1 {
 		lines = lines[1:]
 	}

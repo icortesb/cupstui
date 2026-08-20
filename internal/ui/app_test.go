@@ -9,7 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
 func testModel() Model {
@@ -38,9 +38,9 @@ func testModel() Model {
 	return m
 }
 
-// Cada pestaña se dibuja completa: ninguna línea puede quedar sin fondo ni con
-// un ancho distinto al de la pantalla, porque ahí se cuela el fondo del
-// terminal y el texto se vuelve ilegible.
+// Every tab draws in full: no line may be left unpainted or at a width other
+// than the screen's, because that is where the terminal background slips
+// through and the text turns unreadable.
 func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 	withColor(t)
 	bg := backgroundSequence()
@@ -50,32 +50,32 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 		set  func(m *Model)
 	}{
 		{"dashboard", func(m *Model) { m.tab = tabDashboard }},
-		{"cola", func(m *Model) { m.tab = tabQueue }},
-		{"impresoras", func(m *Model) { m.tab = tabPrinters }},
-		{"ayuda", func(m *Model) { m.showHelp = true }},
-		{"con error", func(m *Model) { m.err = &cups.Error{Kind: cups.KindDaemonDown, Hint: "CUPS no responde"} }},
-		{"confirmando", func(m *Model) {
+		{"queue", func(m *Model) { m.tab = tabQueue }},
+		{"printers", func(m *Model) { m.tab = tabPrinters }},
+		{"help", func(m *Model) { m.showHelp = true }},
+		{"with an error", func(m *Model) { m.err = &cups.Error{Kind: cups.KindDaemonDown, Hint: "CUPS no responde"} }},
+		{"confirming", func(m *Model) {
 			m.tab = tabQueue
 			m.confirm = &confirmation{prompt: "¿Cancelar el trabajo 42?"}
 		}},
-		{"imprimir", func(m *Model) { m.tab = tabPrint }},
+		{"print", func(m *Model) { m.tab = tabPrint }},
 		{"logs", func(m *Model) {
 			m.tab = tabLogs
 			m.logs.setLines([]string{"E [19/Aug/2026] algo falló", "W aviso"}, nil)
 		}},
-		{"logs sin permisos", func(m *Model) {
+		{"logs without permission", func(m *Model) {
 			m.tab = tabLogs
 			m.logs.setLines(nil, &cups.Error{Kind: cups.KindForbidden, Hint: "sin permisos"})
 		}},
-		{"alta: explorando", func(m *Model) {
+		{"add: scanning", func(m *Model) {
 			m.add.active = true
 			m.add.loading = true
 		}},
-		{"alta: dispositivos", func(m *Model) {
+		{"add: devices", func(m *Model) {
 			m.add.active = true
 			m.add.devices = []cups.Device{{URI: "lpd://1.2.3.4:515/x", MakeModel: "EPSON L3150"}}
 		}},
-		{"alta: drivers", func(m *Model) {
+		{"add: drivers", func(m *Model) {
 			m.add.active = true
 			m.add.step = stepDriver
 			m.add.matches = []cups.PPD{{Name: "a.ppd", MakeModel: "EPSON L3150 Series"}}
@@ -95,11 +95,11 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 				{Printer: "HP_LaserJet", User: "ana", Pages: 9, Document: "b.pdf", When: time.Now()},
 			}, nil)
 		}},
-		{"añadiendo: explorando con spinner", func(m *Model) {
+		{"add: scanning with spinner", func(m *Model) {
 			m.add.active = true
 			m.add.loading = true
 		}},
-		{"history sin permisos", func(m *Model) {
+		{"history without permission", func(m *Model) {
 			m.tab = tabHistory
 			m.history.setEntries(nil, &cups.Error{Kind: cups.KindForbidden, Hint: "denied"})
 		}},
@@ -121,7 +121,7 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 		{"quotas", func(m *Model) {
 			m.policy.start(m.snap.Printers[0])
 		}},
-		{"alta: datos", func(m *Model) {
+		{"add: details", func(m *Model) {
 			m.add.active = true
 			m.add.step = stepDetails
 			m.add.chosenURI = "lpd://1.2.3.4:515/x"
@@ -134,10 +134,10 @@ func TestEveryTabPaintsTheWholeScreen(t *testing.T) {
 
 			for i, line := range strings.Split(m.View(), "\n") {
 				if !strings.HasPrefix(line, bg) {
-					t.Errorf("línea %d sin fondo: %q", i, first(line, 40))
+					t.Errorf("line %d has no background: %q", i, first(line, 40))
 				}
 				if w := lipgloss.Width(line); w != m.width {
-					t.Errorf("línea %d mide %d, quiero %d: %q", i, w, m.width, first(line, 40))
+					t.Errorf("line %d is %d wide, want %d: %q", i, w, m.width, first(line, 40))
 				}
 			}
 		})
@@ -148,7 +148,7 @@ func TestViewNeverExceedsTheTerminalHeight(t *testing.T) {
 	withColor(t)
 	m := testModel()
 	if got := strings.Count(m.View(), "\n") + 1; got > m.height {
-		t.Errorf("la vista ocupa %d líneas y la pantalla tiene %d", got, m.height)
+		t.Errorf("the view takes %d lines and the screen has %d", got, m.height)
 	}
 }
 
@@ -181,9 +181,9 @@ func typeInto(m Model, text string) Model {
 }
 
 func TestTypingInAFormFieldDoesNotTriggerGlobalShortcuts(t *testing.T) {
-	// Los atajos globales (1..5 cambian de pestaña, q sale, / filtra) no pueden
-	// robarle las teclas a un campo de texto: escribir una ruta como
-	// /tmp/informe1.txt tiene que quedar escrita, no cambiar de pantalla.
+	// The global shortcuts (1..6 switch tabs, q quits, / filters) cannot steal
+	// keys from a text field: typing a path such as /tmp/report1.txt must end
+	// up written, not change the screen.
 	m := testModel()
 	m.tab = tabPrint
 	m.print.focus = fieldFile
@@ -193,10 +193,10 @@ func TestTypingInAFormFieldDoesNotTriggerGlobalShortcuts(t *testing.T) {
 	m = typeInto(m, path)
 
 	if m.tab != tabPrint {
-		t.Errorf("cambió a la pestaña %v mientras se escribía", m.tab)
+		t.Errorf("switched to tab %v while typing", m.tab)
 	}
 	if got := m.print.path.Value(); got != path {
-		t.Errorf("el campo quedó en %q, quiero %q", got, path)
+		t.Errorf("the field holds %q, want %q", got, path)
 	}
 }
 
@@ -208,10 +208,10 @@ func TestTypingInTheQueueFilterDoesNotTriggerGlobalShortcuts(t *testing.T) {
 	m = typeInto(m, "informe1")
 
 	if m.tab != tabQueue {
-		t.Errorf("cambió a la pestaña %v mientras se filtraba", m.tab)
+		t.Errorf("switched to tab %v while filtering", m.tab)
 	}
 	if got := m.queue.filter.Value(); got != "informe1" {
-		t.Errorf("el filtro quedó en %q", got)
+		t.Errorf("the filter holds %q", got)
 	}
 }
 
@@ -224,35 +224,34 @@ func TestEscapeLeavesTheTextFieldSoShortcutsWorkAgain(t *testing.T) {
 	next, _ := m.Update(press("esc"))
 	m = next.(Model)
 	if m.print.editing() {
-		t.Fatal("esc tiene que sacar el foco del campo de texto")
+		t.Fatal("esc must take focus off the text field")
 	}
 
 	next, _ = m.Update(press("2"))
 	if got := next.(Model).tab; got != tabQueue {
-		t.Errorf("después de esc, 2 debería ir a la Cola, fui a %v", got)
+		t.Errorf("after esc, 2 should go to the Queue, went to %v", got)
 	}
 }
 
-// En el formulario de impresión las flechas ←/→ cambian el valor del campo, así
-// que no pueden además cambiar de pestaña. Para que no se quede uno encerrado,
-// tab y shift+tab tienen que cambiar de pestaña siempre, incluso mientras se
-// escribe en un campo de texto.
+// In the print form the ←/→ arrows change the field value, so they cannot also
+// switch tabs. To keep nobody trapped, tab and shift+tab must switch tabs
+// always, even while typing in a text field.
 func TestTabSwitchesTabsEvenWhileEditingThePrintForm(t *testing.T) {
 	withColor(t)
 	m := testModel()
 	m.tab = tabPrint
-	m.print.focus = fieldFile // un campo de texto
+	m.print.focus = fieldFile // a text field
 	m.print.applyFocus()
 
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	if got := next.(Model).tab; got != tabPrint+1 {
-		t.Errorf("tab desde Imprimir fue a %v, quiero la siguiente pestaña", got)
+		t.Errorf("tab desde Imprimir fue a %v, want the next tab", got)
 	}
 
 	m.tab = tabPrint
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	if got := next.(Model).tab; got != tabPrint-1 {
-		t.Errorf("shift+tab desde Imprimir fue a %v, quiero la anterior", got)
+		t.Errorf("shift+tab desde Imprimir fue a %v, want the previous one", got)
 	}
 }
 
@@ -266,10 +265,10 @@ func TestArrowsMoveBetweenFormFieldsWhileEditing(t *testing.T) {
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = next.(Model)
 	if m.print.focus != fieldPrinter {
-		t.Errorf("↓ dejó el foco en %d, quiero fieldPrinter", m.print.focus)
+		t.Errorf("↓ left focus on %d, want fieldPrinter", m.print.focus)
 	}
 	if m.tab != tabPrint {
-		t.Errorf("↓ cambió de pestaña a %v", m.tab)
+		t.Errorf("↓ switched tab to %v", m.tab)
 	}
 }
 
@@ -282,13 +281,13 @@ func TestHorizontalArrowsEditTextInsteadOfCyclingValues(t *testing.T) {
 	m.print.ranges.SetValue("12")
 	m.print.ranges.SetCursor(2)
 
-	// ← mueve el cursor dentro del texto; lo que se escriba después entra ahí.
+	// ← moves the cursor inside the text; whatever is typed next lands there.
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyLeft})
 	m = next.(Model)
 	m = typeInto(m, "9")
 
 	if got := m.print.ranges.Value(); got != "192" {
-		t.Errorf("el campo quedó en %q, quiero \"192\": ← tiene que mover el cursor, no cambiar un valor", got)
+		t.Errorf("the field holds %q, want \"192\": ← must move the cursor, not change a value", got)
 	}
 }
 
@@ -298,17 +297,17 @@ func TestTransparencyCanBeToggledAtRuntime(t *testing.T) {
 
 	painted := backgroundSequence()
 	if painted == "" {
-		t.Fatal("de arranque la aplicación tiene que pintar su fondo")
+		t.Fatal("on startup the application must paint its background")
 	}
 
 	next, _ := m.Update(press("T"))
 	m = next.(Model)
 	if backgroundSequence() != "" {
-		t.Error("después del toggle no se tiene que pintar fondo")
+		t.Error("after the toggle no background must be painted")
 	}
 	for i, line := range strings.Split(m.View(), "\n") {
 		if strings.HasPrefix(line, painted) {
-			t.Errorf("línea %d sigue pintada en modo transparente", i)
+			t.Errorf("line %d is still painted in transparent mode", i)
 			break
 		}
 	}
@@ -316,20 +315,20 @@ func TestTransparencyCanBeToggledAtRuntime(t *testing.T) {
 	next, _ = m.Update(press("T"))
 	m = next.(Model)
 	if backgroundSequence() != painted {
-		t.Error("el segundo toggle tiene que devolver el fondo")
+		t.Error("the second toggle must bring the background back")
 	}
 	for i, line := range strings.Split(m.View(), "\n") {
 		if !strings.HasPrefix(line, painted) {
-			t.Errorf("línea %d quedó sin pintar al volver del modo transparente", i)
+			t.Errorf("line %d was left unpainted on returning from transparent mode", i)
 			break
 		}
 	}
 }
 
-// El buscador de archivos pide el contenido del directorio con un comando, y
-// la respuesta llega como un mensaje cualquiera. Si el modelo raíz no le
-// reenvía los mensajes que no son teclas, el listado nunca le llega y muestra
-// "Bummer. No Files Found." aunque el directorio esté lleno.
+// The file browser asks for the directory contents with a command, and the
+// answer arrives as an ordinary message. If the root model does not forward the
+// messages that are not keys, the listing never reaches it and it shows
+// "Bummer. No Files Found." with the directory full.
 func TestFilePickerReceivesItsDirectoryListing(t *testing.T) {
 	withColor(t)
 	m := testModel()
@@ -337,20 +336,20 @@ func TestFilePickerReceivesItsDirectoryListing(t *testing.T) {
 
 	cmd := m.print.openPicker()
 	if cmd == nil {
-		t.Fatal("abrir el buscador tiene que pedir el listado")
+		t.Fatal("opening the browser must request the listing")
 	}
 
-	// Se ejecuta el comando y su mensaje se mete por el Update del modelo raíz,
-	// igual que haría bubbletea.
+	// Run the command and feed its message through the root Update, just as
+	// bubbletea would.
 	next, _ := m.Update(cmd())
 	m = next.(Model)
 
 	view := m.print.picker.View()
 	if strings.Contains(view, "Bummer") {
-		t.Errorf("el buscador quedó vacío:\n%s", view)
+		t.Errorf("the browser came up empty:\n%s", view)
 	}
 	if strings.TrimSpace(view) == "" {
-		t.Error("el buscador no dibujó nada")
+		t.Error("the browser drew nothing")
 	}
 }
 
@@ -360,10 +359,10 @@ func TestFilePickerStartsInTheHomeDirectory(t *testing.T) {
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		t.Skip("sin directorio personal")
+		t.Skip("no home directory")
 	}
 	if got := m.print.picker.CurrentDirectory; got != home {
-		t.Errorf("el buscador arranca en %q, quiero %q", got, home)
+		t.Errorf("the browser starts at %q, want %q", got, home)
 	}
 }
 

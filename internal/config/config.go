@@ -1,4 +1,4 @@
-// Package config guarda las preferencias de la aplicación entre sesiones.
+// Package config keeps the application preferences between sessions.
 package config
 
 import (
@@ -7,16 +7,16 @@ import (
 	"path/filepath"
 )
 
-// Config son las preferencias que sobreviven al cierre. El cero de cada campo
-// es el valor por omisión, así que un archivo ausente o incompleto funciona.
+// Config holds the preferences that survive a restart. The zero value of each
+// field is the default, so a missing or partial file still works.
 type Config struct {
-	// Transparent deja ver el fondo del terminal en vez de pintar el propio.
+	// Transparent lets the terminal background show instead of painting one.
 	Transparent bool `json:"transparent"`
 	// Seen records that the startup checks have already been shown once.
 	Seen bool `json:"seen"`
 }
 
-// Path es dónde vive el archivo, respetando XDG_CONFIG_HOME.
+// Path is where the file lives, honouring XDG_CONFIG_HOME.
 func Path() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -25,9 +25,9 @@ func Path() (string, error) {
 	return filepath.Join(dir, "cupstui", "config.json"), nil
 }
 
-// Load lee las preferencias. Cualquier problema —archivo ausente, ilegible o
-// corrupto— devuelve los valores por omisión: una preferencia de aspecto no
-// puede impedir que la aplicación arranque.
+// Load reads the preferences. Any problem — missing, unreadable or corrupt
+// file — yields the defaults: a look and feel preference cannot stop the
+// application from starting.
 func Load() Config {
 	var c Config
 
@@ -45,7 +45,7 @@ func Load() Config {
 	return c
 }
 
-// Save escribe las preferencias, creando el directorio si hace falta.
+// Save writes the preferences, creating the directory if needed.
 func Save(c Config) error {
 	path, err := Path()
 	if err != nil {

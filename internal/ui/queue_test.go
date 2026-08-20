@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
 func TestJobStateShowsProgressOnlyWhilePrinting(t *testing.T) {

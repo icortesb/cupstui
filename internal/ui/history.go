@@ -11,7 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
 // historyEntries caps how much of the page log is kept in memory.
@@ -191,17 +191,33 @@ func (h historyModel) summaryView() string {
 			len(h.visible), len(h.all), pages))
 	}
 
-	left := usageTable("BY USER", cups.UsageByUser(h.visible), pages)
-	right := usageTable("BY PRINTER", cups.UsageByPrinter(h.visible), pages)
+	// Side by side each column gets half the screen. Below the point where a
+	// name, a bar and the numbers still fit, they stack instead of wrapping.
+	column := h.width/2 - 1
+	if column < minUsageColumn {
+		body := lipgloss.JoinVertical(lipgloss.Left,
+			usageTable("BY USER", cups.UsageByUser(h.visible), pages, h.width),
+			"",
+			usageTable("BY PRINTER", cups.UsageByPrinter(h.visible), pages, h.width))
+		return lipgloss.JoinVertical(lipgloss.Left, head, "", body)
+	}
+
+	left := usageTable("BY USER", cups.UsageByUser(h.visible), pages, column)
+	right := usageTable("BY PRINTER", cups.UsageByPrinter(h.visible), pages, column)
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top,
-		styleApp.Width(h.width/2).Render(left), right)
+		styleApp.Width(column+1).Render(left), right)
 	return lipgloss.JoinVertical(lipgloss.Left, head, "", body)
 }
 
+// minUsageColumn is the narrowest a totals column can be and still hold a
+// name, a bar and the counts.
+const minUsageColumn = 46
+
 // usageTable lists totals with a share bar, so the distribution reads at a
-// glance rather than from comparing numbers.
-func usageTable(title string, rows []cups.Usage, totalPages int) string {
+// glance rather than from comparing numbers. It is drawn to fit width: two of
+// these sit side by side and a row that overflows wraps into the other one.
+func usageTable(title string, rows []cups.Usage, totalPages, width int) string {
 	var b strings.Builder
 	b.WriteString("  " + styleBold.Render(title) + "\n")
 
@@ -215,16 +231,47 @@ func usageTable(title string, rows []cups.Usage, totalPages int) string {
 			b.WriteString("  " + styleDim.Render(fmt.Sprintf("+%d more", len(rows)-i)) + "\n")
 			break
 		}
+
 		share := 0.0
 		if totalPages > 0 {
 			share = float64(r.Pages) / float64(totalPages)
 		}
-		fmt.Fprintf(&b, "  %s %s %s\n",
-			styleValue.Render(pad(truncate(r.Name, 16), 16)),
-			styleAccentText.Render(miniBar(share, 10)),
-			styleDim.Render(fmt.Sprintf("%d pages · %d jobs", r.Pages, r.Jobs)))
+		counts := fmt.Sprintf("%dp · %dj", r.Pages, r.Jobs)
+		name, bar := usageWidths(width, len([]rune(counts)))
+
+		row := "  " + styleValue.Render(pad(truncate(r.Name, name), name))
+		if bar > 0 {
+			row += " " + styleAccentText.Render(miniBar(share, bar))
+		}
+		b.WriteString(row + " " + styleDim.Render(counts) + "\n")
 	}
 	return b.String()
+}
+
+// usageWidths shares a row out between the name and the share bar. The counts
+// are never dropped — they are the report — and the bar goes first when the
+// column is too narrow for everything.
+func usageWidths(width, counts int) (name, bar int) {
+	// Two leading spaces plus one separator before the counts, and one more
+	// before the bar when there is a bar.
+	available := width - 2 - 1 - counts
+
+	bar = 10
+	if available < bar+1+4 {
+		bar = 0
+	}
+	name = available - bar
+	if bar > 0 {
+		name--
+	}
+
+	if name < 3 {
+		name = 3
+	}
+	if name > 20 {
+		name = 20
+	}
+	return name, bar
 }
 
 // readHistory loads the page log off the UI goroutine.

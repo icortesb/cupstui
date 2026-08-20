@@ -1,9 +1,15 @@
 BIN := cupstui
+PKG := ./cmd/cupstui
 
-.PHONY: build test run vet fmt clean
+# CGO is off and the symbol table stripped: the result is a single static
+# binary that runs on any Linux with no library to match.
+BUILDFLAGS := CGO_ENABLED=0
+LDFLAGS := -s -w
+
+.PHONY: build test vet fmt run install clean
 
 build:
-	go build -o $(BIN) ./cmd/cupstui
+	$(BUILDFLAGS) go build -ldflags="$(LDFLAGS)" -o $(BIN) $(PKG)
 
 test:
 	go test ./...
@@ -16,6 +22,9 @@ fmt:
 
 run: build
 	./$(BIN)
+
+install:
+	$(BUILDFLAGS) go install -ldflags="$(LDFLAGS)" $(PKG)
 
 clean:
 	rm -f $(BIN)

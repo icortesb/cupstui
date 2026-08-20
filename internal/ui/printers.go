@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
 // printersModel es la vista de impresoras: una lista navegable con acciones.

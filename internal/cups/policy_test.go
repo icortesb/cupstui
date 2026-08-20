@@ -19,7 +19,7 @@ func TestPolicyArgsSetLimitsAndPeriod(t *testing.T) {
 	for _, want := range []string{
 		"-p Epson_L3150",
 		"-o job-page-limit=100",
-		"-o job-quota-period=604800", // 7 días en segundos
+		"-o job-quota-period=604800", // seven days in seconds
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in %q", want, got)
@@ -28,8 +28,8 @@ func TestPolicyArgsSetLimitsAndPeriod(t *testing.T) {
 }
 
 func TestPolicyArgsClearLimitsWithZero(t *testing.T) {
-	// Sin esto no habría forma de quitar una cuota ya puesta: omitir la opción
-	// deja la que estaba.
+	// Without this there would be no way to clear a quota already set: an
+	// omitted option leaves the previous value in place.
 	got := policyArgs(t, Policy{})
 	for _, want := range []string{"job-page-limit=0", "job-k-limit=0", "job-quota-period=0"} {
 		if !strings.Contains(got, want) {

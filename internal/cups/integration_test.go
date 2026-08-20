@@ -6,11 +6,11 @@ import (
 	"testing"
 )
 
-// TestAgainstLocalCUPS habla con el CUPS de la máquina. Se saltea solo si el
-// demonio no está corriendo, así no rompe la suite en un entorno sin CUPS.
+// TestAgainstLocalCUPS talks to the CUPS on this machine. It skips itself when
+// the daemon is not running, so the suite still passes where CUPS is absent.
 func TestAgainstLocalCUPS(t *testing.T) {
 	if testing.Short() {
-		t.Skip("necesita un CUPS vivo")
+		t.Skip("needs a live CUPS")
 	}
 	c, err := New()
 	if err != nil {
@@ -19,7 +19,7 @@ func TestAgainstLocalCUPS(t *testing.T) {
 	snap, err := c.Snapshot(context.Background())
 	var cerr *Error
 	if errors.As(err, &cerr) && cerr.Kind == KindDaemonDown {
-		t.Skipf("CUPS no está corriendo: %v", err)
+		t.Skipf("CUPS is not running: %v", err)
 	}
 	if err != nil {
 		t.Fatalf("Snapshot: %v", err)

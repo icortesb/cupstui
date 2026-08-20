@@ -21,9 +21,9 @@ func deviceResponse(uris ...string) *ipp.Response {
 }
 
 func TestDevicesDropBareBackends(t *testing.T) {
-	// CUPS devuelve los backends disponibles (smb, http, lpd, beh) mezclados
-	// con los dispositivos que encontró. Un backend pelado no se puede agregar
-	// como impresora, así que no tiene por qué aparecer en la lista.
+	// CUPS returns the available backends (smb, http, lpd, beh) mixed in with
+	// the devices it found. A bare backend cannot be added as a printer, so it
+	// has no business in the list.
 	f := &fakeAdapter{responses: map[int16]*ipp.Response{
 		ipp.OperationCupsGetDevices: deviceResponse(
 			"smb", "http", "beh",
@@ -38,11 +38,11 @@ func TestDevicesDropBareBackends(t *testing.T) {
 		t.Fatalf("Devices: %v", err)
 	}
 	if len(devs) != 3 {
-		t.Fatalf("quedaron %d dispositivos, quiero 3: %+v", len(devs), devs)
+		t.Fatalf("%d devices remain, want 3: %+v", len(devs), devs)
 	}
 	for _, d := range devs {
 		if !strings.Contains(d.URI, "://") {
-			t.Errorf("se coló un backend pelado: %q", d.URI)
+			t.Errorf("a bare backend slipped through: %q", d.URI)
 		}
 	}
 }
@@ -56,7 +56,7 @@ func TestDevicesComeSortedByURI(t *testing.T) {
 	devs, _ := newTestClient(f).Devices(t.Context())
 	for i := 1; i < len(devs); i++ {
 		if devs[i-1].URI > devs[i].URI {
-			t.Errorf("desordenado: %q antes de %q", devs[i-1].URI, devs[i].URI)
+			t.Errorf("out of order: %q before %q", devs[i-1].URI, devs[i].URI)
 		}
 	}
 }
@@ -70,14 +70,14 @@ func TestMatchPPDsRanksTheClosestModelFirst(t *testing.T) {
 
 	got := MatchPPDs(ppds, "EPSON L3150 Series")
 	if len(got) == 0 || got[0].Name != "b.ppd" {
-		t.Errorf("el primero debería ser b.ppd, tengo %+v", got)
+		t.Errorf("the first should be b.ppd, got %+v", got)
 	}
 }
 
 func TestMatchPPDsWithoutQueryReturnsEverything(t *testing.T) {
 	ppds := []PPD{{Name: "a.ppd"}, {Name: "b.ppd"}}
 	if got := MatchPPDs(ppds, ""); len(got) != 2 {
-		t.Errorf("MatchPPDs sin consulta = %d, quiero 2", len(got))
+		t.Errorf("MatchPPDs with no query = %d, want 2", len(got))
 	}
 }
 
@@ -86,14 +86,14 @@ func TestPrinterNameValidation(t *testing.T) {
 	for _, name := range invalid {
 		t.Run(name, func(t *testing.T) {
 			if err := ValidatePrinterName(name); err == nil {
-				t.Errorf("%q debería rechazarse", name)
+				t.Errorf("%q should be rejected", name)
 			}
 		})
 	}
 
 	for _, name := range []string{"Epson_L3150", "hp-laserjet", "impresora2"} {
 		if err := ValidatePrinterName(name); err != nil {
-			t.Errorf("%q debería aceptarse: %v", name, err)
+			t.Errorf("%q should be accepted: %v", name, err)
 		}
 	}
 }
@@ -113,7 +113,7 @@ func TestAddPrinterSendsAddModifyWithDeviceAndDriver(t *testing.T) {
 
 	req := f.sentOperation(ipp.OperationCupsAddModifyPrinter)
 	if req == nil {
-		t.Fatal("no se envió CUPS-Add-Modify-Printer")
+		t.Fatal("CUPS-Add-Modify-Printer was not sent")
 	}
 	if got, _ := req.OperationAttributes[ipp.AttributePPDName].(string); got != "lsb/usr/epson.ppd" {
 		t.Errorf("ppd-name = %q", got)
@@ -121,13 +121,13 @@ func TestAddPrinterSendsAddModifyWithDeviceAndDriver(t *testing.T) {
 	if got, _ := req.PrinterAttributes[ipp.AttributeDeviceURI].(string); got != "socket://192.168.0.56:9100" {
 		t.Errorf("device-uri = %q", got)
 	}
-	// Una impresora recién creada que no acepta trabajos ni está habilitada no
-	// le sirve a nadie.
+	// A printer created neither enabled nor accepting jobs is no use to
+	// anyone.
 	if got := req.PrinterAttributes[ipp.AttributePrinterIsAcceptingJobs]; got != true {
-		t.Errorf("printer-is-accepting-jobs = %v, quiero true", got)
+		t.Errorf("printer-is-accepting-jobs = %v, want true", got)
 	}
 	if got := req.PrinterAttributes[ipp.AttributePrinterState]; got != 3 {
-		t.Errorf("printer-state = %v, quiero 3 (idle)", got)
+		t.Errorf("printer-state = %v, want 3 (idle)", got)
 	}
 }
 
@@ -137,17 +137,17 @@ func TestAddPrinterRejectsABadName(t *testing.T) {
 		Name: "nombre con espacios", DeviceURI: "socket://x:9100",
 	})
 	if err == nil {
-		t.Fatal("quiero un error de validación")
+		t.Fatal("want a validation error")
 	}
 	if f.sentOperation(ipp.OperationCupsAddModifyPrinter) != nil {
-		t.Error("no se tiene que enviar nada si el nombre es inválido")
+		t.Error("nothing must be sent when the name is invalid")
 	}
 }
 
 func TestAddPrinterRequiresADeviceURI(t *testing.T) {
 	f := &fakeAdapter{}
 	if err := newTestClient(f).AddPrinter(t.Context(), NewPrinterSpec{Name: "ok"}); err == nil {
-		t.Fatal("quiero un error si falta la URI del dispositivo")
+		t.Fatal("want an error when the device URI is missing")
 	}
 }
 

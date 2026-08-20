@@ -29,13 +29,13 @@ func TestPrinterFromAttributes(t *testing.T) {
 	}))
 
 	if p.Name != "Epson_L3150" {
-		t.Errorf("Name = %q, quiero Epson_L3150", p.Name)
+		t.Errorf("Name = %q, want Epson_L3150", p.Name)
 	}
 	if p.State != StateIdle {
-		t.Errorf("State = %v, quiero StateIdle", p.State)
+		t.Errorf("State = %v, want StateIdle", p.State)
 	}
 	if !p.Accepting {
-		t.Error("Accepting = false, quiero true")
+		t.Error("Accepting = false, want true")
 	}
 	if p.Info != "Epson L3150 WiFi" {
 		t.Errorf("Info = %q", p.Info)
@@ -50,7 +50,7 @@ func TestPrinterFromAttributes(t *testing.T) {
 		t.Errorf("DeviceURI = %q", p.DeviceURI)
 	}
 	if len(p.Reasons) != 0 {
-		t.Errorf("Reasons = %v, quiero vacío porque 'none' no es un motivo real", p.Reasons)
+		t.Errorf("Reasons = %v, want it empty porque 'none' no es un motivo real", p.Reasons)
 	}
 }
 
@@ -63,8 +63,8 @@ func TestPrinterStateMapping(t *testing.T) {
 		{"idle", 3, StateIdle},
 		{"processing", 4, StatePrinting},
 		{"stopped", 5, StateStopped},
-		{"valor desconocido", 99, StateUnknown},
-		{"atributo ausente", nil, StateUnknown},
+		{"unknown value", 99, StateUnknown},
+		{"missing attribute", nil, StateUnknown},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestPrinterStateMapping(t *testing.T) {
 				kv["printer-state"] = c.value
 			}
 			if got := printerFromAttributes("x", attrs(kv)).State; got != c.want {
-				t.Errorf("State = %v, quiero %v", got, c.want)
+				t.Errorf("State = %v, want %v", got, c.want)
 			}
 		})
 	}
@@ -88,7 +88,7 @@ func TestPrinterReasonsIgnoresNone(t *testing.T) {
 	})
 	want := []string{"media-empty-warning", "offline-report"}
 	if len(p.Reasons) != 2 || p.Reasons[0] != want[0] || p.Reasons[1] != want[1] {
-		t.Errorf("Reasons = %v, quiero %v", p.Reasons, want)
+		t.Errorf("Reasons = %v, want %v", p.Reasons, want)
 	}
 }
 

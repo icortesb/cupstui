@@ -7,20 +7,20 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
-// logLines es cuántas líneas del final del registro se conservan en memoria.
+// logLines is how many lines from the end of the log are kept in memory.
 const logLines = 500
 
-// logsModel muestra un registro de CUPS con seguimiento en vivo.
+// logsModel shows one CUPS log, following it live.
 type logsModel struct {
 	vp    viewport.Model
-	file  int // índice dentro de cups.LogFiles
+	file  int // index into cups.LogFiles
 	lines []string
 	err   error
-	// follow mantiene la vista pegada al final; se apaga al desplazarse hacia
-	// arriba para poder leer sin que el refresco arrastre la pantalla.
+	// follow keeps the view pinned to the end; it turns off when scrolling up
+	// so a line can be read without the refresh dragging the screen away.
 	follow bool
 }
 
@@ -67,7 +67,7 @@ func (l *logsModel) render() {
 func (l *logsModel) update(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
 	l.vp, cmd = l.vp.Update(msg)
-	// Seguir solo mientras se esté mirando el final.
+	// Keep following only while the end is in view.
 	l.follow = l.vp.AtBottom()
 	return cmd
 }
@@ -120,7 +120,7 @@ func colourise(lines []string) []string {
 	return out
 }
 
-// readLog lee el registro fuera del hilo de la UI.
+// readLog reads the log off the UI goroutine.
 func readLog(file cups.LogFile) tea.Cmd {
 	return func() tea.Msg {
 		lines, err := cups.Tail(file.Path, logLines)

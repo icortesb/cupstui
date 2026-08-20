@@ -10,10 +10,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
-// queueModel es la vista de cola: una tabla de trabajos más un campo de filtro.
+// queueModel is the queue view: a table of jobs plus a filter field.
 type queueModel struct {
 	table     table.Model
 	filter    textinput.Model
@@ -37,8 +37,8 @@ func newQueue() queueModel {
 	return q
 }
 
-// restyle vuelve a aplicar los estilos, que la tabla y el campo de filtro se
-// guardan por copia al construirse.
+// restyle reapplies the styles, which the table and the filter field copy when
+// they are built.
 func (q *queueModel) restyle() {
 	s := table.DefaultStyles()
 	s.Header = base().
@@ -64,10 +64,10 @@ func (q *queueModel) restyle() {
 	q.filter.PlaceholderStyle = styleDim
 }
 
-// queueColumns reparte el ancho disponible dejando que el nombre del documento
-// se quede con lo que sobra.
+// queueColumns shares out the available width, leaving the document name
+// whatever is left over.
 func queueColumns(width int) []table.Column {
-	const fixed = 6 + 12 + 18 + 13 + 7 // id, usuario, impresora, estado, hora
+	const fixed = 6 + 12 + 18 + 13 + 7 // id, usuario, impresora, estado, when
 	doc := width - fixed - 14          // 14 = padding de las celdas
 	if doc < 10 {
 		doc = 10
@@ -92,23 +92,23 @@ func (q *queueModel) setSize(width, height int) {
 	q.table.SetHeight(height)
 }
 
-// setJobs vuelve a armar las filas aplicando el filtro vigente, conservando la
-// posición del cursor en la medida de lo posible.
+// setJobs rebuilds the rows under the current filter, keeping the cursor
+// position as far as it can.
 func (q *queueModel) setJobs(jobs []cups.Job) {
 	q.visible = cups.FilterJobs(jobs, q.filter.Value())
 
 	rows := make([]table.Row, 0, len(q.visible))
 	for _, j := range q.visible {
-		hora := ""
+		when := ""
 		if !j.Created.IsZero() {
-			hora = j.Created.Format("15:04")
+			when = j.Created.Format("15:04")
 		}
 		name := j.Name
 		if name == "" {
 			name = "(untitled)"
 		}
 		rows = append(rows, table.Row{
-			strconv.Itoa(j.ID), j.User, name, j.Printer, jobState(j), hora,
+			strconv.Itoa(j.ID), j.User, name, j.Printer, jobState(j), when,
 		})
 	}
 

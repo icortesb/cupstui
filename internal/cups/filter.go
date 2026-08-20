@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// field nombra un campo del trabajo por el que se puede acotar la búsqueda.
+// field names a job field a search can be scoped to.
 type field int
 
 const (
@@ -16,7 +16,7 @@ const (
 	fieldName
 )
 
-// qualifiers son los prefijos que acotan un término a un solo campo.
+// qualifiers are the prefixes that scope a term to a single field.
 var qualifiers = map[string]field{
 	"user":     fieldUser,
 	"printer":  fieldPrinter,
@@ -26,17 +26,17 @@ var qualifiers = map[string]field{
 	"name":     fieldName,
 }
 
-// term es un término de búsqueda ya interpretado.
+// term is one search term, already read.
 type term struct {
 	field field
 	text  string
 }
 
-// FilterJobs devuelve los trabajos que coinciden con la consulta.
+// FilterJobs returns the jobs matching the query.
 //
-// Cada término suelto se busca en id, usuario, documento, impresora y estado;
-// un término con prefijo (impresora:epson, usuario:ana, estado:retenido) se
-// busca solo en ese campo. Los términos se acumulan: todos tienen que coincidir.
+// A bare term is looked for in the id, user, document, printer and state; a
+// term with a prefix (printer:epson, user:ana, state:held) is looked for in
+// that field alone. Terms combine: every one must match.
 func FilterJobs(jobs []Job, query string) []Job {
 	terms := parseQuery(query)
 	if len(terms) == 0 {
@@ -60,7 +60,7 @@ func parseQuery(query string) []term {
 
 		if prefix, rest, found := strings.Cut(word, ":"); found {
 			if qf, ok := qualifiers[prefix]; ok {
-				// "usuario:" sin valor no acota nada, se descarta.
+				// "user:" with no value scopes nothing, so it is dropped.
 				if rest == "" {
 					continue
 				}

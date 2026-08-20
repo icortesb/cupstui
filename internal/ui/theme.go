@@ -6,8 +6,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Paleta. Se usan colores ANSI 256 para que ande en cualquier terminal, con
-// variante clara/oscura donde importa el contraste.
+// Palette. ANSI 256 colours, so it works in any terminal, with a light and a
+// dark variant wherever contrast matters.
 var (
 	colorBG     = lipgloss.AdaptiveColor{Light: "255", Dark: "234"}
 	colorBGAlt  = lipgloss.AdaptiveColor{Light: "253", Dark: "236"}
@@ -19,11 +19,11 @@ var (
 	colorText   = lipgloss.AdaptiveColor{Light: "235", Dark: "253"}
 )
 
-// transparent deja pasar el fondo del terminal en vez de pintar el propio.
+// transparent lets the terminal background through instead of painting one.
 //
-// Por omisión la app pinta su fondo: en un terminal translúcido, un texto gris
-// que se lee sobre una zona oscura del fondo de escritorio desaparece sobre una
-// clara, y no hay color de letra que resuelva eso.
+// By default the application paints its own: in a translucent terminal, grey
+// text that reads over a dark part of the desktop disappears over a light one,
+// and no choice of foreground colour fixes that.
 var transparent bool
 
 var (
@@ -51,15 +51,15 @@ var (
 
 func init() { SetTransparent(false) }
 
-// SetTransparent reconstruye los estilos. Hay que llamarlo antes de New.
+// SetTransparent rebuilds the styles. Call it before New.
 func SetTransparent(v bool) {
 	transparent = v
 	buildStyles()
 }
 
-// base es el punto de partida de todo estilo: si la app pinta su fondo, cada
-// fragmento de texto tiene que llevarlo, porque los tramos sin color de fondo
-// dejan ver el del terminal y rompen el bloque.
+// base is where every style starts: when the application paints a background,
+// each fragment of text has to carry it, because runs with no background colour
+// let the terminal's show through and break up the block.
 func base() lipgloss.Style {
 	s := lipgloss.NewStyle()
 	if !transparent {
@@ -133,12 +133,12 @@ func buildStyles() {
 	}
 }
 
-// backgroundSequence devuelve la secuencia ANSI que activa el color de fondo de
-// la aplicación, resuelta para el perfil de color y el tema vigentes.
+// backgroundSequence returns the ANSI sequence that turns on the application
+// background, resolved for the active colour profile and theme.
 //
-// Se obtiene pidiéndole a lipgloss que pinte un carácter centinela y quedándose
-// con lo que emite antes: así no hay que replicar a mano ni la degradación de
-// perfil ni la elección entre variante clara y oscura.
+// It is obtained by asking lipgloss to paint a sentinel character and keeping
+// what it emits before it, so neither the profile degradation nor the choice
+// between light and dark has to be reimplemented here.
 func backgroundSequence() string {
 	if transparent {
 		return ""
@@ -147,18 +147,18 @@ func backgroundSequence() string {
 	rendered := lipgloss.NewStyle().Background(colorBG).Render(sentinel)
 	i := strings.Index(rendered, sentinel)
 	if i <= 0 {
-		return "" // terminal sin color
+		return "" // a terminal with no colour
 	}
 	return rendered[:i]
 }
 
-// paintBackground fuerza el fondo de la aplicación en toda la pantalla.
+// paintBackground forces the application background across the whole screen.
 //
-// No alcanza con poner Background en cada estilo: los espacios y los bordes que
-// se concatenan a mano no llevan estilo, y cada `\x1b[0m` con el que lipgloss
-// cierra un fragmento devuelve el fondo al del terminal. En una terminal
-// translúcida eso deja el texto sobre el fondo de escritorio, ilegible en
-// cuanto la imagen tiene una zona clara.
+// Setting Background on every style is not enough: the spaces and borders
+// joined by hand carry no style, and each `\x1b[0m` lipgloss closes a fragment
+// with returns the background to the terminal's. In a translucent terminal that
+// leaves text sitting on the desktop wallpaper, unreadable as soon as the image
+// has a light area.
 func paintBackground(view string, width int) string {
 	bg := backgroundSequence()
 	if bg == "" {
@@ -167,7 +167,7 @@ func paintBackground(view string, width int) string {
 
 	lines := strings.Split(view, "\n")
 	for i, line := range lines {
-		// Repintar después de cada reset, sea total (0m) o solo de fondo (49m).
+		// Repaint after every reset, whether full (0m) or background only (49m).
 		line = strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+bg)
 		line = strings.ReplaceAll(line, "\x1b[49m", "\x1b[49m"+bg)
 

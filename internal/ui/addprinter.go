@@ -10,10 +10,10 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
-// discoveryTimeout acota la exploración: CUPS sondea la red y puede tardar.
+// discoveryTimeout bounds the scan: CUPS probes the network and can take a while.
 const discoveryTimeout = 30 * time.Second
 
 type addStep int
@@ -25,7 +25,7 @@ const (
 	stepDetails
 )
 
-// addModel es el asistente para dar de alta una impresora.
+// addModel is the wizard for creating a printer.
 type addModel struct {
 	active  bool
 	step    addStep
@@ -76,7 +76,7 @@ func newAdd() addModel {
 	return a
 }
 
-// restyle vuelve a aplicar los estilos a los campos de texto.
+// restyle reapplies the styles to the text fields.
 func (a *addModel) restyle() {
 	for _, t := range []*textinput.Model{&a.uri, &a.ppdFilter, &a.name, &a.info, &a.location} {
 		styleInput(t)
@@ -90,10 +90,10 @@ func (a *addModel) setSize(width, height int) {
 	}
 }
 
-// start abre el asistente y lanza la exploración.
+// start opens the wizard and launches the scan.
 func (a *addModel) start(c *cups.Client) tea.Cmd {
-	// El tamaño lo trae el WindowSizeMsg, que ya pasó: hay que conservarlo
-	// antes de reemplazar el modelo por uno limpio.
+	// The size arrives with the WindowSizeMsg, which is already past: keep it
+	// before replacing the model with a clean one.
 	width, height := a.width, a.height
 	*a = newAdd()
 	a.setSize(width, height)
@@ -109,7 +109,7 @@ func (a *addModel) cancel() {
 	a.active = false
 }
 
-// listRows es cuántas filas de lista entran en pantalla.
+// listRows is how many list rows fit on screen.
 func (a addModel) listRows() int {
 	rows := a.height - 6
 	if rows < 3 {
@@ -139,7 +139,7 @@ func fetchPPDs(c *cups.Client) tea.Cmd {
 	}
 }
 
-// deviceCount incluye la opción de escribir la URI a mano, siempre última.
+// deviceCount includes the manual URI entry, always last.
 func (a addModel) deviceCount() int { return len(a.devices) + 1 }
 
 func (a *addModel) refreshMatches() {
@@ -148,8 +148,8 @@ func (a *addModel) refreshMatches() {
 	a.ppdCursor = 0
 }
 
-// handleKey procesa una tecla y devuelve el comando resultante. El asistente se
-// queda con todas las teclas mientras está abierto.
+// handleKey processes one key and returns the resulting command. The wizard
+// takes every key while it is open.
 func (a *addModel) handleKey(msg tea.KeyMsg, c *cups.Client) tea.Cmd {
 	switch msg.String() {
 	case "esc":
@@ -245,11 +245,11 @@ func (a *addModel) back() {
 	}
 }
 
-// advance pasa al paso siguiente y, en el último, crea la impresora.
+// advance moves to the next step and, on the last one, creates the printer.
 func (a *addModel) advance(c *cups.Client) tea.Cmd {
 	switch a.step {
 	case stepDevice:
-		if a.devCursor == len(a.devices) { // la opción manual
+		if a.devCursor == len(a.devices) { // the manual entry
 			a.step = stepURI
 			a.uri.Focus()
 			return textinput.Blink
@@ -309,8 +309,8 @@ func (a *addModel) advance(c *cups.Client) tea.Cmd {
 	return nil
 }
 
-// suggestName propone un nombre válido a partir de lo que informó el
-// dispositivo, que es casi siempre lo que uno quiere.
+// suggestName proposes a valid name from what the device reported, which is
+// almost always the one wanted.
 func (a *addModel) suggestName(d cups.Device) {
 	base := d.MakeModel
 	if base == "" || strings.EqualFold(base, "unknown") {

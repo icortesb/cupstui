@@ -12,12 +12,12 @@ import (
 	ipp "github.com/phin1x/go-ipp"
 )
 
-// fakeCUPS es un cupsd de mentira sobre un socket unix que cuenta cuántas
-// conexiones TCP/unix distintas le abrieron.
+// fakeCUPS is a pretend cupsd on a unix socket that counts how many separate
+// connections were opened to it.
 type fakeCUPS struct {
 	socket      string
 	connections *int64
-	headers     *atomic.Value // http.Header del último pedido
+	headers     *atomic.Value // http.Header of the last request
 }
 
 func (f *fakeCUPS) lastHeader(name string) string {
@@ -28,8 +28,8 @@ func (f *fakeCUPS) lastHeader(name string) string {
 func startFakeCUPS(t *testing.T) *fakeCUPS {
 	t.Helper()
 
-	// El path del socket tiene un límite duro de 108 bytes, así que se usa un
-	// nombre corto dentro del TempDir.
+	// The socket path has a hard limit of 108 bytes, so a short name inside
+	// the TempDir is used.
 	sock := filepath.Join(t.TempDir(), "c.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
@@ -68,10 +68,10 @@ func startFakeCUPS(t *testing.T) *fakeCUPS {
 }
 
 func TestSocketAdapterReusesOneConnection(t *testing.T) {
-	// La regresión que motiva este test: go-ipp arma un http.Transport nuevo
-	// por request y no lo cierra, así que cada refresco deja un socket colgado
-	// hasta que el GC lo junte. Con refresco cada 3s eso llena el MaxClients
-	// de cupsd (100) y deja al sistema de impresión sin atender a nadie.
+	// The regression behind this test: go-ipp builds a new http.Transport per
+	// request and never closes it, so every refresh leaves a socket hanging
+	// until the GC collects it. Refreshing every 3s that fills the MaxClients
+	// of cupsd (100) and leaves the printing system serving nobody.
 	fake := startFakeCUPS(t)
 	a := newSocketAdapter(fake.socket)
 
@@ -83,7 +83,7 @@ func TestSocketAdapterReusesOneConnection(t *testing.T) {
 	}
 
 	if got := atomic.LoadInt64(fake.connections); got != 1 {
-		t.Errorf("el adapter abrió %d conexiones para 20 requests, quiero 1", got)
+		t.Errorf("the adapter opened %d connections for 20 requests, want 1", got)
 	}
 }
 
@@ -100,7 +100,7 @@ func TestSocketAdapterBuildsCUPSURIs(t *testing.T) {
 	}
 	for _, c := range cases {
 		if got := a.GetHttpUri(c.namespace, c.object); got != c.want {
-			t.Errorf("GetHttpUri(%q, %v) = %q, quiero %q", c.namespace, c.object, got, c.want)
+			t.Errorf("GetHttpUri(%q, %v) = %q, want %q", c.namespace, c.object, got, c.want)
 		}
 	}
 }
@@ -111,10 +111,10 @@ func TestSocketAdapterReportsMissingSocket(t *testing.T) {
 
 	_, err := a.SendRequestContext(context.Background(), a.GetHttpUri("", nil), req, nil)
 	if err == nil {
-		t.Fatal("quiero un error cuando el socket no existe")
+		t.Fatal("want an error when the socket does not exist")
 	}
 	if classify(err).Kind != KindDaemonDown {
-		t.Errorf("el error debería clasificarse como KindDaemonDown, tengo %v", err)
+		t.Errorf("the error should classify as KindDaemonDown, got %v", err)
 	}
 }
 
@@ -125,23 +125,23 @@ func TestFindSocketPrefersAnExistingSocket(t *testing.T) {
 		t.Fatalf("findSocket: %v", err)
 	}
 	if got != fake.socket {
-		t.Errorf("findSocket = %q, quiero %q", got, fake.socket)
+		t.Errorf("findSocket = %q, want %q", got, fake.socket)
 	}
 }
 
 func TestFindSocketFailsWhenNoneExists(t *testing.T) {
 	_, err := findSocket([]string{"/no/existe", "/tampoco"})
 	if classify(err).Kind != KindDaemonDown {
-		t.Errorf("quiero KindDaemonDown, tengo %v", err)
+		t.Errorf("want KindDaemonDown, got %v", err)
 	}
 }
 
 func TestSocketAdapterOmitsAuthorizationWhenThereIsNoCertificate(t *testing.T) {
-	// El certificado local de CUPS solo lo puede leer root. Mandar
-	// "Authorization: Local" con el valor vacío hace que cupsd escriba
-	// "Local authentication certificate not found." en su error_log por cada
-	// pedido, o sea decenas de líneas por minuto con el refresco automático.
-	// El pedido igual se autentica por las credenciales del socket unix.
+	// Only root can read the CUPS local certificate. Sending
+	// "Authorization: Local" with an empty value makes cupsd write
+	// "Local authentication certificate not found." to its error_log for every
+	// request, dozens of lines a minute with the automatic refresh. The request
+	// authenticates by unix socket credentials regardless.
 	fake := startFakeCUPS(t)
 	a := newSocketAdapter(fake.socket)
 	a.certPaths = []string{filepath.Join(t.TempDir(), "no-existe")}
@@ -152,7 +152,7 @@ func TestSocketAdapterOmitsAuthorizationWhenThereIsNoCertificate(t *testing.T) {
 	}
 
 	if got := fake.lastHeader("Authorization"); got != "" {
-		t.Errorf("se mandó Authorization = %q, no se esperaba ninguno", got)
+		t.Errorf("Authorization = %q was sent, none was expected", got)
 	}
 }
 
@@ -171,6 +171,6 @@ func TestSocketAdapterSendsTheCertificateWhenItCanReadIt(t *testing.T) {
 	}
 
 	if got := fake.lastHeader("Authorization"); got != "Local abc123" {
-		t.Errorf("Authorization = %q, quiero \"Local abc123\"", got)
+		t.Errorf("Authorization = %q, want \"Local abc123\"", got)
 	}
 }

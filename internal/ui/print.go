@@ -11,10 +11,10 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
-// Campos del formulario, en el orden en que se recorren.
+// Fields of the form, in the order they are visited.
 const (
 	fieldFile = iota
 	fieldPrinter
@@ -30,13 +30,13 @@ var fieldLabels = [fieldCount]string{
 	"File", "Printer", "Copies", "Pages", "Duplex", "Color", "Orientation",
 }
 
-// printModel es el formulario para mandar un archivo a imprimir.
+// printModel is the form for sending a file to print.
 type printModel struct {
 	focus  int
 	path   textinput.Model
 	ranges textinput.Model
 
-	printer     int // índice en las impresoras; -1 usa la de por omisión
+	printer     int // index into the printers; -1 uses the default one
 	copies      int
 	duplex      cups.Duplex
 	color       cups.ColorMode
@@ -60,8 +60,8 @@ func newPrint() printModel {
 	ranges.CharLimit = 40
 
 	fp := filepicker.New()
-	// Arranca en el directorio personal, pero se puede subir hasta la raíz con
-	// h o ←, así que se llega a cualquier lado.
+	// Starts in the home directory, but h or ← walks up as far as the root, so
+	// anywhere on the machine is reachable.
 	fp.CurrentDirectory, _ = os.UserHomeDir()
 	fp.ShowHidden = false
 	fp.AutoHeight = false
@@ -78,13 +78,13 @@ func newPrint() printModel {
 	return m
 }
 
-// restyle vuelve a aplicar los estilos a los campos de texto.
+// restyle reapplies the styles to the text fields.
 func (p *printModel) restyle() {
 	styleInput(&p.path)
 	styleInput(&p.ranges)
 }
 
-// styleInput deja un campo de texto con los estilos vigentes.
+// styleInput puts the current styles on a text field.
 func styleInput(t *textinput.Model) {
 	t.PromptStyle = styleKey
 	t.TextStyle = styleValue
@@ -101,8 +101,8 @@ func (p *printModel) setSize(width, height int) {
 	}
 }
 
-// applyFocus deja activo el campo de texto correspondiente y apaga el resto,
-// para que el cursor aparezca en uno solo.
+// applyFocus activates the matching text field and blurs the rest, so the
+// cursor shows in one place only.
 func (p *printModel) applyFocus() {
 	p.path.Blur()
 	p.ranges.Blur()
@@ -119,17 +119,17 @@ func (p *printModel) move(delta int) {
 	p.applyFocus()
 }
 
-// editing indica si el campo activo consume las teclas de texto; con uno de
-// estos enfocado, j/k escriben en vez de navegar.
+// editing reports whether the active field consumes typing; with one of these
+// focused, j/k write rather than navigate.
 func (p printModel) editing() bool {
 	return p.focus == fieldFile || p.focus == fieldRanges
 }
 
-// cycle cambia el valor del campo activo. delta es +1 o -1.
+// cycle changes the value of the active field. delta is +1 or -1.
 func (p *printModel) cycle(delta int, printers []cups.Printer) {
 	switch p.focus {
 	case fieldPrinter:
-		n := len(printers) + 1 // +1 por la opción "por omisión"
+		n := len(printers) + 1 // +1 for the "printer default" entry
 		p.printer = ((p.printer+1+delta)+n)%n - 1
 	case fieldCopies:
 		p.copies += delta
@@ -152,7 +152,7 @@ func wrap(v, n int) int {
 	return ((v % n) + n) % n
 }
 
-// options arma las opciones de impresión con lo cargado en el formulario.
+// options builds the print options from what the form holds.
 func (p printModel) options(printers []cups.Printer) cups.PrintOptions {
 	o := cups.PrintOptions{
 		Copies:      p.copies,
@@ -167,7 +167,7 @@ func (p printModel) options(printers []cups.Printer) cups.PrintOptions {
 	return o
 }
 
-// file devuelve la ruta con el ~ expandido.
+// file returns the path with ~ expanded.
 func (p printModel) file() string {
 	path := strings.TrimSpace(p.path.Value())
 	if strings.HasPrefix(path, "~") {
@@ -183,7 +183,7 @@ func (p *printModel) openPicker() tea.Cmd {
 	return p.picker.Init()
 }
 
-// update reparte el mensaje al componente activo.
+// update hands the message to the active component.
 func (p *printModel) update(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
 	switch p.focus {

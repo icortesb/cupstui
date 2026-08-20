@@ -1,4 +1,4 @@
-module github.com/icortes/cupstui
+module github.com/icortesb/cupstui
 
 go 1.26.6
 

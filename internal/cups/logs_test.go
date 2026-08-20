@@ -25,7 +25,7 @@ func TestTailReturnsTheLastLines(t *testing.T) {
 	}
 	want := []string{"tres", "cuatro", "cinco"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
-		t.Errorf("Tail = %v, quiero %v", got, want)
+		t.Errorf("Tail = %v, want %v", got, want)
 	}
 }
 
@@ -35,7 +35,7 @@ func TestTailReturnsEverythingWhenTheFileIsShorter(t *testing.T) {
 		t.Fatalf("Tail: %v", err)
 	}
 	if len(got) != 2 {
-		t.Errorf("Tail = %v, quiero 2 líneas", got)
+		t.Errorf("Tail = %v, want 2 lines", got)
 	}
 }
 
@@ -45,7 +45,7 @@ func TestTailHandlesAFileWithoutTrailingNewline(t *testing.T) {
 		t.Fatalf("Tail: %v", err)
 	}
 	if len(got) != 2 || got[1] != "dos" {
-		t.Errorf("Tail = %v, quiero [uno dos]", got)
+		t.Errorf("Tail = %v, want [uno dos]", got)
 	}
 }
 
@@ -55,23 +55,23 @@ func TestTailOnAnEmptyFileReturnsNothing(t *testing.T) {
 		t.Fatalf("Tail: %v", err)
 	}
 	if len(got) != 0 {
-		t.Errorf("Tail = %v, quiero vacío", got)
+		t.Errorf("Tail = %v, want it empty", got)
 	}
 }
 
 func TestTailReadsOnlyTheEndOfALargeFile(t *testing.T) {
-	// El error_log de CUPS crece sin límite; leerlo entero en cada refresco
-	// sería tirar memoria y disco a la basura.
+	// The CUPS error_log grows without bound; reading it whole on every
+	// refresh would throw memory and disk away.
 	var b strings.Builder
 	for i := 0; i < 200000; i++ {
-		b.WriteString("línea de relleno bastante larga para inflar el archivo\n")
+		b.WriteString("padding line long enough to inflate the file\n")
 	}
 	b.WriteString("la última\n")
 	path := writeTemp(t, b.String())
 
 	fi, _ := os.Stat(path)
 	if fi.Size() < 2*tailWindow {
-		t.Fatalf("el archivo de prueba (%d bytes) tiene que superar la ventana de lectura", fi.Size())
+		t.Fatalf("the test file (%d bytes) must exceed the read window", fi.Size())
 	}
 
 	got, err := Tail(path, 2)
@@ -79,18 +79,18 @@ func TestTailReadsOnlyTheEndOfALargeFile(t *testing.T) {
 		t.Fatalf("Tail: %v", err)
 	}
 	if len(got) == 0 || got[len(got)-1] != "la última" {
-		t.Errorf("no se leyó el final del archivo: %v", got)
+		t.Errorf("the end of the file was not read: %v", got)
 	}
 }
 
 func TestTailClassifiesAMissingFile(t *testing.T) {
 	_, err := Tail(filepath.Join(t.TempDir(), "no-existe"), 5)
 	if err == nil {
-		t.Fatal("quiero un error")
+		t.Fatal("want an error")
 	}
 	var cerr *Error
 	if !asError(err, &cerr) || cerr.Kind != KindNotFound {
-		t.Errorf("quiero KindNotFound, tengo %v", err)
+		t.Errorf("want KindNotFound, got %v", err)
 	}
 }
 
@@ -102,7 +102,7 @@ func TestLogFilesNamesTheUsualCUPSLogs(t *testing.T) {
 	joined := strings.Join(names, " ")
 	for _, want := range []string{"error_log", "access_log", "page_log"} {
 		if !strings.Contains(joined, want) {
-			t.Errorf("falta %s en %v", want, names)
+			t.Errorf("missing %s en %v", want, names)
 		}
 	}
 }

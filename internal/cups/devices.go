@@ -10,7 +10,7 @@ import (
 	ipp "github.com/phin1x/go-ipp"
 )
 
-// Device es un dispositivo que CUPS encontró al explorar.
+// Device is a device CUPS found while scanning.
 type Device struct {
 	URI       string
 	Info      string
@@ -18,19 +18,18 @@ type Device struct {
 	Class     string
 }
 
-// PPD es un archivo de descripción de impresora, o sea un driver.
+// PPD is a PostScript Printer Description file, that is, a driver.
 type PPD struct {
 	Name      string
 	MakeModel string
 }
 
-// DriverlessPPD es el "driver" de las impresoras IPP modernas, que se
-// describen solas y no necesitan PPD del fabricante.
+// DriverlessPPD is the "driver" of modern IPP printers, which describe
+// themselves and need no PPD from the maker.
 const DriverlessPPD = "everywhere"
 
-// Devices explora en busca de impresoras. Es lento —CUPS sondea la red— así
-// que conviene llamarlo con un contexto con plazo y mostrando que está
-// trabajando.
+// Devices scans for printers. It is slow — CUPS probes the network — so call
+// it with a deadline and show that something is happening.
 func (c *Client) Devices(ctx context.Context) (devices []Device, err error) {
 	defer func() { err = classifyNil(recovered(recover(), err)) }()
 
@@ -40,9 +39,9 @@ func (c *Client) Devices(ctx context.Context) (devices []Device, err error) {
 	}
 
 	for uri, a := range raw {
-		// CUPS devuelve también los backends disponibles ("smb", "lpd", "beh")
-		// como si fueran dispositivos. Sin una URI completa no hay nada que
-		// agregar, así que se descartan.
+		// CUPS also returns the available backends ("smb", "lpd", "beh") as if
+		// they were devices. Without a complete URI there is nothing to add,
+		// so they are dropped.
 		if !strings.Contains(uri, "://") {
 			continue
 		}
@@ -58,7 +57,7 @@ func (c *Client) Devices(ctx context.Context) (devices []Device, err error) {
 	return devices, nil
 }
 
-// PPDs devuelve los drivers instalados.
+// PPDs returns the installed drivers.
 func (c *Client) PPDs(ctx context.Context) (ppds []PPD, err error) {
 	defer func() { err = classifyNil(recovered(recover(), err)) }()
 
@@ -73,9 +72,9 @@ func (c *Client) PPDs(ctx context.Context) (ppds []PPD, err error) {
 	return ppds, nil
 }
 
-// MatchPPDs ordena los drivers por cercanía a la consulta y descarta los que no
-// tienen nada que ver. La consulta suele ser el modelo que informó el
-// dispositivo, así el driver correcto queda arriba.
+// MatchPPDs orders the drivers by how close they are to the query and drops
+// the unrelated ones. The query is usually the model the device reported, which
+// puts the right driver on top.
 func MatchPPDs(ppds []PPD, query string) []PPD {
 	words := strings.Fields(strings.ToLower(query))
 	if len(words) == 0 {
@@ -108,12 +107,12 @@ func MatchPPDs(ppds []PPD, query string) []PPD {
 	return result
 }
 
-// printerNamePattern es lo que CUPS acepta como nombre de cola: sin espacios,
-// sin barras y sin numeral.
+// printerNamePattern is what CUPS accepts as a queue name: no spaces, no
+// slashes and no hash.
 var printerNamePattern = regexp.MustCompile(`^[^\s/#]+$`)
 
-// ValidatePrinterName comprueba el nombre antes de mandárselo a CUPS, para dar
-// un mensaje claro en vez de un error de protocolo.
+// ValidatePrinterName checks the name before sending it to CUPS, so the user
+// gets a clear message instead of a protocol error.
 func ValidatePrinterName(name string) error {
 	switch {
 	case name == "":
@@ -126,7 +125,7 @@ func ValidatePrinterName(name string) error {
 	return nil
 }
 
-// NewPrinterSpec describe la impresora que se quiere dar de alta.
+// NewPrinterSpec describes the printer to be created.
 type NewPrinterSpec struct {
 	Name      string
 	DeviceURI string
@@ -135,7 +134,7 @@ type NewPrinterSpec struct {
 	Location  string
 }
 
-// AddPrinter da de alta una impresora, habilitada y aceptando trabajos.
+// AddPrinter creates a printer, enabled and accepting jobs.
 func (c *Client) AddPrinter(ctx context.Context, spec NewPrinterSpec) (err error) {
 	if err := ValidatePrinterName(spec.Name); err != nil {
 		return &Error{Kind: KindUnknown, Hint: err.Error(), Err: err}
@@ -155,7 +154,7 @@ func (c *Client) AddPrinter(ctx context.Context, spec NewPrinterSpec) (err error
 	req.PrinterAttributes[ipp.AttributeDeviceURI] = spec.DeviceURI
 	req.PrinterAttributes[ipp.AttributePrinterInfo] = spec.Info
 	req.PrinterAttributes[ipp.AttributePrinterLocation] = spec.Location
-	// Sin esto la impresora queda creada pero detenida y rechazando trabajos.
+	// Without these the printer is created stopped and rejecting jobs.
 	req.PrinterAttributes[ipp.AttributePrinterIsAcceptingJobs] = true
 	req.PrinterAttributes[ipp.AttributePrinterState] = 3 // idle
 

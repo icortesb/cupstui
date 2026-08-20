@@ -1,0 +1,141 @@
+# cupstui
+
+A terminal interface for CUPS. Watch the print queue, cancel and hold jobs,
+enable and disable printers, send files, add and remove queues, set per-printer
+quotas, read the daemon logs and export a usage report — without leaving the
+terminal or opening the CUPS web page.
+
+```
+ cupstui    Dashboard    Queue   3   Printers    Print    History    Logs    ⟳ 08:25:18
+────────────────────────────────────────────────────────────────────────────────────────
+  1 printer   3 jobs queued
+
+╭──────────────────────────────╮
+│ Epson_L3150  ● idle          │
+│ default                      │
+│ Epson L3150 WiFi             │
+│ 3 jobs waiting               │
+╰──────────────────────────────╯
+```
+
+The queue refreshes on its own every three seconds, and the tab carries its
+count so it can be watched from any other screen.
+
+```
+3 jobs
+ ID      USER          DOCUMENT            PRINTER             STATE          TIME
+──────────────────────────────────────────────────────────────────────────────────────
+ 24      icortes       recibo.pdf          Epson_L3150         held           08:25
+ 23      icortes       factura.pdf         Epson_L3150         held           08:25
+ 22      icortes       informe_anual.pdf   Epson_L3150         held           08:25
+```
+
+A job that is printing shows how far along it is, drawn from the sheet counts
+CUPS reports.
+
+## Install
+
+```sh
+go install github.com/icortesb/cupstui/cmd/cupstui@latest
+```
+
+Or build it:
+
+```sh
+git clone https://github.com/icortesb/cupstui
+cd cupstui
+make build
+```
+
+The result is a static binary with no shared library dependencies.
+
+## Requirements
+
+CUPS, running. Nothing else — `lp` and `lpadmin` ship with CUPS itself, and the
+binary carries no runtime dependencies of its own.
+
+Reading the queue, the printers and the logs works for any user. Enabling a
+printer, setting quotas, adding and removing queues need membership in the CUPS
+administrative group: `wheel` on Arch and Fedora, `lpadmin` on Debian and
+Ubuntu. The first run reports which of these apply on your machine, and
+`cupstui -check` repeats it later.
+
+Only the local CUPS is supported. `CUPS_SERVER` and `~/.cups/client.conf` are
+not read yet.
+
+## Keys
+
+| Key | |
+|---|---|
+| `1`–`6`, `tab` | switch tab |
+| `j` `k` | move |
+| `/` | filter |
+| `r` | refresh now |
+| `?` | help |
+| `T` | toggle transparent background |
+| `q` | quit |
+
+**Queue** — `p` hold or release, `x` cancel, `X` cancel every job.
+
+**Printers** — `e` enable or disable, `d` set as default, `a` accept or reject
+jobs, `A` add, `x` remove, `u` quotas and access.
+
+**Print** — `↑` `↓` change field, `←` `→` change value, `ctrl+o` browse files,
+`enter` print. Copies, page ranges, duplex, colour and orientation.
+
+**History** — `s` totals, `E` export CSV.
+
+**Logs** — `n` next log, `G` jump to the end.
+
+## Filtering
+
+The queue and the history take the same query. A bare term is looked for
+everywhere; a prefixed one is scoped to a single field. Terms combine, and every
+one must match.
+
+```
+printer:epson user:ana state:held
+```
+
+## Usage report
+
+The history is read from the CUPS page log, which is the durable record — the
+daemon keeps only recent completed jobs in memory. `s` switches between the rows
+and the totals:
+
+```
+10 jobs · 3 pages
+
+  BY USER                                BY PRINTER
+  icortes    ██████████ 3p · 10j         Epson_WiFi    ██████████ 3p · 3j
+                                         Epson_L3150   ░░░░░░░░░░ 0p · 7j
+```
+
+`E` writes what the filter currently shows to a dated CSV in your home
+directory.
+
+## Notes on the implementation
+
+Reads and control go over IPP on the unix socket rather than through `lpstat`.
+The output of the command line tools is localised and free-form, while IPP
+returns typed attributes — `printer-state` is an integer and
+`printer-state-reasons` is machine-readable. Over the unix socket CUPS
+authenticates the local user; the same request over TCP to `localhost:631`
+answers 401.
+
+Submitting jobs and setting quotas go through `lp` and `lpadmin` instead. The Go
+IPP library available today sends `copies` twice, cannot encode `page-ranges` as
+a `rangeOfInteger` — it sends text, which the filter may ignore without saying
+so — and attributes the job to root instead of the real user. It also cannot
+encode the multi-valued access list a quota needs. Both were checked against
+CUPS 2.4.19 by comparing the attributes each route leaves stored on the job.
+
+The IPP transport is a single connection with one shared `http.Transport`. The
+library builds a fresh transport per request and never closes it, which leaks a
+socket per query until the collector gets to it; refreshing every few seconds
+that exhausts the `MaxClients` of cupsd and stalls printing for every program on
+the machine, not just this one.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).

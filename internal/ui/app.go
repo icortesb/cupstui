@@ -1,4 +1,4 @@
-// Package ui es la interfaz de terminal, construida sobre bubbletea.
+// Package ui is the terminal interface, built on bubbletea.
 package ui
 
 import (
@@ -16,15 +16,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/icortes/cupstui/internal/config"
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/config"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
-// refreshInterval es cada cuánto se vuelve a consultar CUPS. La consulta corre
-// en un tea.Cmd, así que nunca bloquea el dibujado.
+// refreshInterval is how often CUPS is queried again. The query runs in a
+// tea.Cmd, so it never blocks drawing.
 const refreshInterval = 3 * time.Second
 
-// requestTimeout evita que un CUPS colgado congele el refresco para siempre.
+// requestTimeout keeps a stalled CUPS from freezing the refresh forever.
 const requestTimeout = 5 * time.Second
 
 type tab int
@@ -50,8 +50,8 @@ type (
 		text string
 		err  error
 	}
-	// statusMsg informa el resultado de algo que no cambia el estado de CUPS,
-	// así que no vale la pena refrescar la foto por él.
+	// statusMsg reports something that does not change the state of CUPS, so
+	// it is not worth refreshing the snapshot for.
 	statusMsg struct {
 		text string
 		err  error
@@ -78,24 +78,24 @@ type (
 	}
 )
 
-// confirmation es una acción destructiva esperando el sí del usuario.
+// confirmation is a destructive action waiting for the user to say yes.
 type confirmation struct {
 	prompt string
 	run    func() tea.Msg
 }
 
-// Model es el modelo raíz: mantiene la foto de CUPS y reparte teclas y
-// dibujado entre las vistas.
+// Model is the root model: it holds the CUPS snapshot and hands keys and
+// drawing to the views.
 type Model struct {
 	client *cups.Client
 
 	tab      tab
 	snap     cups.Snapshot
-	err      error // error del último refresco, se muestra como cartel
+	err      error // error from the last refresh, shown as a banner
 	loaded   bool
 	lastSync time.Time
-	// refreshing evita que los tics se apilen si CUPS se pone lento: sin esto
-	// una consulta que tarda más que el intervalo dispara otra encima.
+	// refreshing keeps ticks from stacking up when CUPS turns slow: without it
+	// a query taking longer than the interval starts another on top.
 	refreshing bool
 
 	queue     queueModel
@@ -116,7 +116,7 @@ type Model struct {
 	width, height int
 }
 
-// New arma el modelo raíz con un cliente ya conectado.
+// New builds the root model around a connected client.
 func New(c *cups.Client) Model {
 	return Model{
 		client:    c,
@@ -151,7 +151,7 @@ func tickCmd() tea.Cmd {
 	return tea.Tick(refreshInterval, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
 
-// refresh consulta CUPS fuera del hilo de la UI.
+// refresh queries CUPS off the UI goroutine.
 func (m Model) refresh() tea.Cmd {
 	c := m.client
 	return func() tea.Msg {
@@ -162,8 +162,8 @@ func (m Model) refresh() tea.Cmd {
 	}
 }
 
-// action envuelve una operación de escritura: informa el resultado y dispara
-// un refresco inmediato para que la vista no quede desactualizada.
+// action wraps a write: it reports the outcome and triggers an immediate
+// refresh so the view does not sit stale.
 func action(text string, run func() error) func() tea.Msg {
 	return func() tea.Msg {
 		return actionMsg{text: text, err: run()}
@@ -179,8 +179,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		cmds := []tea.Cmd{tickCmd()}
-		// El registro solo se lee cuando se está mirando: es E/S de disco que
-		// no hace falta pagar en las otras pestañas.
+		// The log is read only while it is on screen: disk I/O the other tabs
+		// need not pay for.
 		if m.tab == tabLogs {
 			cmds = append(cmds, readLog(m.logs.current()))
 		}
@@ -198,8 +198,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		hadError := m.err != nil
 		m.err = msg.err
 		if hadError != (m.err != nil) {
-			// El cartel ocupa una línea: al aparecer o desaparecer cambia el
-			// alto disponible para el contenido.
+			// The banner takes a line: its appearing or leaving changes the
+			// height available to the content.
 			m.resize()
 		}
 		if msg.err == nil {
@@ -258,8 +258,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ppdsMsg:
-		// Los drivers se cargan de fondo mientras se elige el dispositivo; si
-		// fallan, queda la opción sin driver.
+		// Drivers load in the background while a device is chosen; if that
+		// fails, the driverless option remains.
 		m.add.ppds = msg.ppds
 		m.add.refreshMatches()
 		return m, nil
@@ -268,8 +268,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
-	// El buscador de archivos se comunica con mensajes propios (el listado del
-	// directorio, entre otros). Si no se le reenvían, se queda vacío.
+	// The file browser talks through messages of its own, the directory
+	// listing among them. Without forwarding, it stays empty.
 	if m.print.picking {
 		return m, m.print.updatePicker(msg)
 	}
@@ -278,7 +278,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Una confirmación pendiente se come todas las teclas.
+	// A pending confirmation swallows every key.
 	if m.confirm != nil {
 		switch strings.ToLower(msg.String()) {
 		case "y", "s":
@@ -294,9 +294,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Con un campo de texto enfocado, o el buscador de archivos abierto, las
-	// teclas son del formulario: si no, los atajos globales (1..5, r, q, /)
-	// se comerían las letras de lo que se está escribiendo.
+	// With a text field focused, or the file browser open, the keys belong to
+	// the form: otherwise the global shortcuts (1..6, r, q, /) would eat the
+	// letters being typed.
 	// The startup screen takes every key until it is dismissed.
 	if m.preflight.active {
 		switch msg.String() {
@@ -309,8 +309,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// El asistente de alta se queda con todas las teclas: tiene campos de texto
-	// y una lista propia.
+	// The add wizard takes every key: it has text fields and a list of its
+	// own.
 	if m.add.active {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -326,9 +326,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.policy.handleKey(msg)
 	}
 
-	// tab y shift+tab quedan siempre para cambiar de pestaña: en el formulario
-	// las flechas ←/→ cambian el valor del campo, así que sin esto no habría
-	// forma evidente de salir de la pantalla.
+	// tab and shift+tab always switch tabs: in the form the ←/→ arrows change
+	// the field value, so without this there would be no obvious way off the
+	// screen.
 	isTabSwitch := msg.String() == "tab" || msg.String() == "shift+tab"
 
 	if m.tab == tabPrint && !isTabSwitch {
@@ -341,16 +341,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.print.picking = false
 					return m, nil
 				}
-				// Sacar el foco del texto devuelve los atajos globales.
+				// Taking focus off the text brings the global shortcuts back.
 				m.print.focus = fieldPrinter
 				m.print.applyFocus()
 				return m, nil
 			}
 			return m.handlePrintKey(msg)
 		}
-		// Sin un campo de texto activo, el formulario igual se queda con las
-		// teclas de navegación y de valor: h/l y ←/→ cambian la opción, no de
-		// pestaña. El resto (1..5, tab, q, r, ?) sigue siendo global.
+		// With no text field active the form still takes the navigation and
+		// value keys: h/l and ←/→ change the option, not the tab. The rest
+		// (1..6, tab, q, r, ?) stays global.
 		if formKeys[msg.String()] {
 			return m.handlePrintKey(msg)
 		}
@@ -373,7 +373,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Mientras se escribe el filtro, el campo de texto tiene prioridad.
+	// While the filter is being typed, the text field takes priority.
 	if m.tab == tabQueue && m.queue.filtering {
 		switch msg.String() {
 		case "enter":
@@ -449,8 +449,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.goTo((m.tab + tab(len(tabNames)) - 1) % tab(len(tabNames)))
 	}
 
-	// Con la ayuda abierta, las teclas de desplazamiento son suyas: no entra
-	// entera en una terminal corta.
+	// With help open the scrolling keys are its own: it does not fit whole on
+	// a short terminal.
 	if m.showHelp {
 		var cmd tea.Cmd
 		m.helpVP, cmd = m.helpVP.Update(msg)
@@ -518,8 +518,8 @@ func (m Model) handlePrintKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Sobre un campo de texto, ←/→ mueven el cursor dentro de lo escrito; solo
-	// cambian el valor en los campos de opciones.
+	// On a text field, ←/→ move the cursor within what is typed; they change
+	// the value on option fields alone.
 	if !m.print.editing() {
 		switch msg.String() {
 		case "left", "-":
@@ -531,8 +531,8 @@ func (m Model) handlePrintKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Con un campo de texto enfocado, las letras escriben; si no, j/k/h/l
-	// navegan como en el resto de la aplicación.
+	// With a text field focused the letters type; otherwise j/k/h/l navigate as
+	// they do everywhere else in the application.
 	if !m.print.editing() {
 		switch msg.String() {
 		case "j":
@@ -553,8 +553,8 @@ func (m Model) handlePrintKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, m.print.update(msg)
 }
 
-// formKeys son las teclas que el formulario de impresión atiende aunque no
-// haya un campo de texto enfocado.
+// formKeys are the keys the print form handles even with no text field
+// focused.
 var formKeys = map[string]bool{
 	"up": true, "down": true, "left": true, "right": true,
 	"j": true, "k": true, "h": true, "l": true,
@@ -582,7 +582,7 @@ func (m Model) submitPrint() (tea.Model, tea.Cmd) {
 	}
 }
 
-// goTo cambia de pestaña y dispara la carga que esa pestaña necesite.
+// goTo switches tab and starts whatever loading that tab needs.
 func (m Model) goTo(t tab) (tea.Model, tea.Cmd) {
 	m.tab = t
 	switch t {
@@ -735,8 +735,8 @@ func (m *Model) setStatus(text string, isErr bool) {
 	m.statusIsErr = isErr
 }
 
-// describeError arma el texto que ve el usuario: la pista accionable si el
-// paquete cups supo clasificar el fallo, o el error crudo si no.
+// describeError builds what the user sees: the actionable hint when the cups
+// package could classify the failure, and the raw error when it could not.
 func describeError(err error) string {
 	var cerr *cups.Error
 	if errors.As(err, &cerr) && cerr.Hint != "" {
@@ -745,7 +745,7 @@ func describeError(err error) string {
 	return err.Error()
 }
 
-// resize reparte el tamaño de la ventana entre las vistas.
+// resize shares the window size out among the views.
 func (m *Model) resize() {
 	body := m.bodyHeight()
 	m.queue.setSize(m.width, body-2)
@@ -776,7 +776,7 @@ func rememberSeen() tea.Cmd {
 	}
 }
 
-// rememberTransparency guarda la preferencia para la próxima sesión.
+// rememberTransparency saves the preference for the next session.
 func rememberTransparency(on bool) tea.Cmd {
 	return func() tea.Msg {
 		text := "Opaque background."
@@ -792,8 +792,8 @@ func rememberTransparency(on bool) tea.Cmd {
 	}
 }
 
-// restyle vuelve a aplicar los estilos a los componentes que se los guardaron
-// al construirse. Hace falta al cambiar el modo transparente en caliente.
+// restyle reapplies the styles to the components that copied them when they
+// were built. Needed when transparent mode changes at runtime.
 func (m *Model) restyle() {
 	m.queue.restyle()
 	m.history.restyle()
@@ -803,8 +803,8 @@ func (m *Model) restyle() {
 	m.helpVP.SetContent(helpView(m.width))
 }
 
-// bodyHeight es lo que queda para el contenido: el encabezado ocupa dos líneas
-// (título y borde), el pie una, y el cartel de error otra cuando está.
+// bodyHeight is what is left for the content: the header takes two lines
+// (title and border), the footer one, and the banner another when present.
 func (m Model) bodyHeight() int {
 	h := m.height - 3
 	if m.err != nil {
@@ -840,8 +840,8 @@ func (m Model) View() string {
 	b.WriteString("\n")
 	b.WriteString(m.footerView())
 
-	// Se pinta la pantalla entera para que no queden huecos por donde se vea el
-	// fondo del terminal.
+	// The whole screen is painted so no gaps are left for the terminal
+	// background to show through.
 	return paintBackground(b.String(), m.width)
 }
 

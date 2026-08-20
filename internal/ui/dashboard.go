@@ -7,10 +7,10 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/icortes/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/cups"
 )
 
-// dashboardView muestra una tarjeta por impresora y el resumen de la cola.
+// dashboardView shows one card per printer plus the queue summary.
 func dashboardView(snap cups.Snapshot, width int) string {
 	if len(snap.Printers) == 0 {
 		return styleDim.Render("  No printers configured on this CUPS server.")
@@ -120,7 +120,7 @@ func printerCard(p cups.Printer, jobs int) string {
 	return style.Width(30).Render(strings.Join(lines, "\n"))
 }
 
-// joinCards acomoda las tarjetas en filas según el ancho de la terminal.
+// joinCards lays the cards out in rows to suit the terminal width.
 func joinCards(cards []string, width int) string {
 	const cardWidth = 33
 	perRow := width / cardWidth

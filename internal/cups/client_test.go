@@ -76,22 +76,22 @@ func TestSnapshotReturnsPrintersJobsAndDefault(t *testing.T) {
 		t.Fatalf("Snapshot: %v", err)
 	}
 	if len(snap.Printers) != 2 {
-		t.Fatalf("Printers = %d, quiero 2", len(snap.Printers))
+		t.Fatalf("Printers = %d, want 2", len(snap.Printers))
 	}
 	if snap.Printers[0].Name != "Epson_L3150" || snap.Printers[1].Name != "HP_LaserJet" {
-		t.Errorf("las impresoras deben venir ordenadas por nombre, tengo %v", snap.Printers)
+		t.Errorf("printers must come sorted by name, got %v", snap.Printers)
 	}
 	if !snap.Printers[1].IsDefault {
-		t.Error("HP_LaserJet debería estar marcada como default")
+		t.Error("HP_LaserJet should be marked as default")
 	}
 	if snap.Printers[0].IsDefault {
-		t.Error("Epson_L3150 no es default")
+		t.Error("Epson_L3150 is not the default")
 	}
 	if snap.Default != "HP_LaserJet" {
 		t.Errorf("Default = %q", snap.Default)
 	}
 	if len(snap.Jobs) != 2 || snap.Jobs[0].ID != 42 {
-		t.Errorf("los jobs deben venir ordenados del más nuevo al más viejo, tengo %v", snap.Jobs)
+		t.Errorf("jobs must come newest first, got %v", snap.Jobs)
 	}
 }
 
@@ -101,16 +101,16 @@ func TestSnapshotSurfacesClassifiedError(t *testing.T) {
 	_, err := newTestClient(f).Snapshot(context.Background())
 	var cerr *Error
 	if !errors.As(err, &cerr) {
-		t.Fatalf("quiero un *cups.Error, tengo %T (%v)", err, err)
+		t.Fatalf("want a *cups.Error, got %T (%v)", err, err)
 	}
 	if cerr.Kind != KindDaemonDown {
-		t.Errorf("Kind = %v, quiero KindDaemonDown", cerr.Kind)
+		t.Errorf("Kind = %v, want KindDaemonDown", cerr.Kind)
 	}
 }
 
 func TestSnapshotDoesNotPanicOnMalformedResponse(t *testing.T) {
-	// La librería hace type assertions sin chequear: una respuesta sin
-	// printer-name la haría entrar en pánico y matar la TUI entera.
+	// The library type asserts without checking: a response with no
+	// printer-name would panic and take the whole interface down.
 	f := &fakeAdapter{responses: map[int16]*ipp.Response{
 		ipp.OperationCupsGetPrinters: {PrinterAttributes: []ipp.Attributes{
 			attrs(map[string]interface{}{"printer-state": 3}),
@@ -119,7 +119,7 @@ func TestSnapshotDoesNotPanicOnMalformedResponse(t *testing.T) {
 
 	_, err := newTestClient(f).Snapshot(context.Background())
 	if err == nil {
-		t.Fatal("quiero un error, no un pánico ni un éxito silencioso")
+		t.Fatal("want an error, not a panic or a silent success")
 	}
 }
 
@@ -130,12 +130,12 @@ func TestCancelJobSendsCancelJobOperation(t *testing.T) {
 	}
 	req := f.sentOperation(ipp.OperationCancelJob)
 	if req == nil {
-		t.Fatal("no se envió Cancel-Job")
+		t.Fatal("Cancel-Job was not sent")
 	}
-	// La librería identifica el trabajo por job-uri, no por job-id.
+	// The library identifies the job by job-uri, not by job-id.
 	uri, _ := req.OperationAttributes[ipp.AttributeJobURI].(string)
 	if printerNameFromURI(uri) != "42" {
-		t.Errorf("job-uri = %q, quiero que apunte al trabajo 42", uri)
+		t.Errorf("job-uri = %q, want it to point at job 42", uri)
 	}
 }
 
@@ -149,10 +149,10 @@ func TestDisableAndEnablePrinterSendPauseAndResume(t *testing.T) {
 		t.Fatalf("EnablePrinter: %v", err)
 	}
 	if f.sentOperation(ipp.OperationPausePrinter) == nil {
-		t.Error("DisablePrinter debería mandar Pause-Printer")
+		t.Error("DisablePrinter should send Pause-Printer")
 	}
 	if f.sentOperation(ipp.OperationResumePrinter) == nil {
-		t.Error("EnablePrinter debería mandar Resume-Printer")
+		t.Error("EnablePrinter should send Resume-Printer")
 	}
 }
 
@@ -163,11 +163,11 @@ func TestSetDefaultSendsCupsSetDefaultWithPrinterURI(t *testing.T) {
 	}
 	req := f.sentOperation(ipp.OperationCupsSetDefault)
 	if req == nil {
-		t.Fatal("no se envió CUPS-Set-Default")
+		t.Fatal("CUPS-Set-Default was not sent")
 	}
 	uri, _ := req.OperationAttributes[ipp.AttributePrinterURI].(string)
 	if printerNameFromURI(uri) != "Epson_L3150" {
-		t.Errorf("printer-uri = %q, quiero que apunte a Epson_L3150", uri)
+		t.Errorf("printer-uri = %q, want it to point at Epson_L3150", uri)
 	}
 }
 
@@ -175,7 +175,7 @@ func TestActionErrorsAreClassified(t *testing.T) {
 	f := &fakeAdapter{err: ipp.HTTPError{Code: 403}}
 	var cerr *Error
 	if err := newTestClient(f).DisablePrinter("x"); !errors.As(err, &cerr) || cerr.Kind != KindForbidden {
-		t.Errorf("quiero KindForbidden, tengo %v", err)
+		t.Errorf("want KindForbidden, got %v", err)
 	}
 }
 
@@ -186,11 +186,11 @@ func TestHoldJobSendsHoldJobOperation(t *testing.T) {
 	}
 	req := f.sentOperation(ipp.OperationHoldJob)
 	if req == nil {
-		t.Fatal("no se envió Hold-Job")
+		t.Fatal("Hold-Job was not sent")
 	}
 	uri, _ := req.OperationAttributes[ipp.AttributeJobURI].(string)
 	if printerNameFromURI(uri) != "42" {
-		t.Errorf("job-uri = %q, quiero que apunte al trabajo 42", uri)
+		t.Errorf("job-uri = %q, want it to point at job 42", uri)
 	}
 }
 
@@ -200,7 +200,7 @@ func TestReleaseJobSendsReleaseJobOperation(t *testing.T) {
 		t.Fatalf("ReleaseJob: %v", err)
 	}
 	if f.sentOperation(ipp.OperationReleaseJob) == nil {
-		t.Fatal("no se envió Release-Job")
+		t.Fatal("Release-Job was not sent")
 	}
 }
 
@@ -208,6 +208,6 @@ func TestJobActionErrorsAreClassified(t *testing.T) {
 	f := &fakeAdapter{err: ipp.HTTPError{Code: 401}}
 	var cerr *Error
 	if err := newTestClient(f).HoldJob(1); !errors.As(err, &cerr) || cerr.Kind != KindForbidden {
-		t.Errorf("quiero KindForbidden, tengo %v", err)
+		t.Errorf("want KindForbidden, got %v", err)
 	}
 }

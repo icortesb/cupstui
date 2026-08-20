@@ -1,4 +1,4 @@
-// cupstui es una interfaz de terminal para administrar la impresión en CUPS.
+// Command cupstui is a terminal interface for managing printing on CUPS.
 package main
 
 import (
@@ -8,9 +8,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/icortes/cupstui/internal/config"
-	"github.com/icortes/cupstui/internal/cups"
-	"github.com/icortes/cupstui/internal/ui"
+	"github.com/icortesb/cupstui/internal/config"
+	"github.com/icortesb/cupstui/internal/cups"
+	"github.com/icortesb/cupstui/internal/ui"
 )
 
 func main() {
@@ -20,8 +20,8 @@ func main() {
 		"report what this machine can and cannot do, then continue")
 	flag.Parse()
 
-	// La preferencia guardada manda, salvo que se pase el flag explícitamente.
-	// La tecla T la cambia y la guarda durante la sesión.
+	// The saved preference wins unless the flag is given explicitly. The T key
+	// changes it and saves it during the session.
 	saved := config.Load()
 	setting := saved.Transparent
 	flag.Visit(func(f *flag.Flag) {
@@ -39,7 +39,7 @@ func main() {
 
 	defer client.Close()
 
-	// Sin WithAltScreen la TUI dejaría basura en el scrollback al salir.
+	// Without WithAltScreen the interface would leave debris in the scrollback.
 	model := ui.New(client)
 	// The checks run on the first start, when nothing is known about the
 	// machine yet, and on request after that.
