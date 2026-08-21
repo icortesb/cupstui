@@ -994,7 +994,7 @@ func (m Model) headerView() string {
 	}
 
 	left := lipgloss.JoinHorizontal(lipgloss.Bottom,
-		append([]string{styleTitle.Render("cupstui"), " "}, tabs...)...)
+		append([]string{titleView("cupstui"), " "}, tabs...)...)
 
 	right := styleDim.Render(m.syncLabel())
 	if server := m.serverLabel(); server != "" {

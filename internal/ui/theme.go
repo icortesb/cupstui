@@ -7,20 +7,40 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	colorful "github.com/lucasb-eyer/go-colorful"
 	"github.com/muesli/termenv"
 )
 
-// Palette. ANSI 256 colours, so it works in any terminal, with a light and a
-// dark variant wherever contrast matters.
+// Palette. Written in hex rather than as ANSI 256 indices: lipgloss knows what
+// the terminal can take and steps the colour down to the nearest one it has, so
+// a capable terminal gets the colour that was chosen instead of whichever
+// corner of the xterm cube happened to be closest to it.
+//
+// Every fill colour is dark in the light theme and light in the dark one, which
+// is what lets colorInk be the one readable foreground for all of them.
 var (
-	colorBG     = lipgloss.AdaptiveColor{Light: "255", Dark: "234"}
-	colorBGAlt  = lipgloss.AdaptiveColor{Light: "253", Dark: "236"}
-	colorAccent = lipgloss.AdaptiveColor{Light: "26", Dark: "81"}
-	colorOK     = lipgloss.AdaptiveColor{Light: "28", Dark: "78"}
-	colorWarn   = lipgloss.AdaptiveColor{Light: "130", Dark: "215"}
-	colorErr    = lipgloss.AdaptiveColor{Light: "160", Dark: "203"}
-	colorMuted  = lipgloss.AdaptiveColor{Light: "241", Dark: "247"}
-	colorText   = lipgloss.AdaptiveColor{Light: "235", Dark: "253"}
+	colorBG     = lipgloss.AdaptiveColor{Light: "#f7f8fa", Dark: "#16181d"}
+	colorBGAlt  = lipgloss.AdaptiveColor{Light: "#eceef2", Dark: "#1e2128"}
+	colorAccent = lipgloss.AdaptiveColor{Light: "#0a63c2", Dark: "#62c8ff"}
+	colorOK     = lipgloss.AdaptiveColor{Light: "#12794a", Dark: "#4fd6a0"}
+	colorWarn   = lipgloss.AdaptiveColor{Light: "#9a5a00", Dark: "#f5b661"}
+	colorErr    = lipgloss.AdaptiveColor{Light: "#c62828", Dark: "#ff6b6b"}
+	colorMuted  = lipgloss.AdaptiveColor{Light: "#5c6472", Dark: "#8b93a5"}
+	colorText   = lipgloss.AdaptiveColor{Light: "#1f2430", Dark: "#e2e6ee"}
+
+	// colorInk is what goes on top of a filled block — the title, the active
+	// tab, a badge, the banner. It has to invert with the theme: the fills are
+	// dark blues and reds on a light terminal, where near-black text on them
+	// was barely there.
+	colorInk = lipgloss.AdaptiveColor{Light: "#f7f8fa", Dark: "#0d1016"}
+
+	// titleGradient tints the name in the header across its letters. It only
+	// shows on a terminal with 24-bit colour; anywhere else the steps collapse
+	// onto each other and the title is drawn flat instead.
+	titleGradient = [2]lipgloss.AdaptiveColor{
+		colorAccent,
+		{Light: "#6d28d9", Dark: "#c4a2ff"},
+	}
 )
 
 // transparent lets the terminal background through instead of painting one.
@@ -118,7 +138,7 @@ func buildStyles() {
 
 	styleTitle = base().
 		Bold(true).
-		Foreground(lipgloss.Color("232")).
+		Foreground(colorInk).
 		Background(colorAccent).
 		Padding(0, 1)
 
@@ -126,7 +146,7 @@ func buildStyles() {
 	// names, an underline is easy to miss.
 	styleTabActive = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("232")).
+		Foreground(colorInk).
 		Background(colorAccent).
 		Padding(0, 2)
 
@@ -136,7 +156,7 @@ func buildStyles() {
 
 	styleBadge = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("232")).
+		Foreground(colorInk).
 		Background(colorWarn).
 		Padding(0, 1)
 
@@ -150,7 +170,7 @@ func buildStyles() {
 	styleStatusErr = base().Foreground(colorErr).Bold(true).Padding(0, 1)
 
 	styleBanner = base().
-		Foreground(lipgloss.Color("232")).
+		Foreground(colorInk).
 		Background(colorErr).
 		Bold(true).
 		Padding(0, 1)
@@ -222,4 +242,49 @@ func paintBackground(view string, width int) string {
 		lines[i] = bg + line + "\x1b[0m"
 	}
 	return strings.Join(lines, "\n")
+}
+
+// titleView draws the application name in the header, stepping its background
+// from one end of titleGradient to the other across the letters.
+//
+// A gradient is only drawn where there are enough colours to draw one with: on
+// anything below 24-bit every step lands on the same cell of the palette, and
+// what should be a fade comes out as a flat block with a seam in it. There the
+// title is rendered as it always was.
+func titleView(name string) string {
+	if lipgloss.ColorProfile() != termenv.TrueColor {
+		return styleTitle.Render(name)
+	}
+
+	from, err1 := colorful.Hex(resolve(titleGradient[0]))
+	to, err2 := colorful.Hex(resolve(titleGradient[1]))
+	if err1 != nil || err2 != nil {
+		return styleTitle.Render(name)
+	}
+
+	// The padding styleTitle would have added is drawn here instead, as the two
+	// end colours, so the block keeps its shape.
+	runes := []rune(" " + name + " ")
+	var b strings.Builder
+	for i, r := range runes {
+		// Blending in Lab keeps the midpoint from going muddy the way it does
+		// when the two ends are mixed channel by channel in RGB.
+		pos := float64(i) / float64(len(runes)-1)
+		step := from.BlendLab(to, pos).Clamped()
+		b.WriteString(lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colorInk).
+			Background(lipgloss.Color(step.Hex())).
+			Render(string(r)))
+	}
+	return b.String()
+}
+
+// resolve picks the side of an adaptive colour the terminal is actually using,
+// which lipgloss will only do while rendering.
+func resolve(c lipgloss.AdaptiveColor) string {
+	if lipgloss.HasDarkBackground() {
+		return c.Dark
+	}
+	return c.Light
 }

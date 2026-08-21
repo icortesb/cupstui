@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.12 — 2026-08-20
 
 - The Logs tab folds a run of the same message into one line with a count.
   cupsd writes "Local authentication certificate not found." once per client
@@ -17,6 +17,17 @@
 - The level letter and the timestamp are dimmed. They are the same thirty
   characters at the start of every line, and colouring them along with the
   message left a wall of red in which nothing stood out.
+- The palette is written in hex instead of as ANSI 256 indices. lipgloss steps
+  a colour down to whatever the terminal can take, so nothing is lost on a
+  smaller palette, but a terminal with 24-bit colour now gets the colour that
+  was chosen rather than the nearest corner of the xterm cube.
+- Text on a filled block — the title, the active tab, a badge, the error
+  banner — inverts with the theme. It was near-black throughout, which on a
+  light terminal put black text on the dark blue title and the dark red
+  banner and left both barely readable.
+- The name in the header fades across its letters, on terminals with the
+  colour to draw a fade with. Everywhere else it is the flat block it was,
+  and it measures the same either way, so the tab bar does not move.
 
 ## v0.1.11 — 2026-08-20
 

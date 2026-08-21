@@ -78,3 +78,57 @@ func TestPaintBackgroundLeavesViewAloneWhenTransparent(t *testing.T) {
 		t.Errorf("in transparent mode the view is untouched, got %q", got)
 	}
 }
+
+// withProfile pins the colour profile for one test and puts back what was
+// there, so the tests do not depend on the terminal running them.
+func withProfile(t *testing.T, p termenv.Profile) {
+	t.Helper()
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(p)
+	t.Cleanup(func() {
+		lipgloss.SetColorProfile(prev)
+		SetTransparent(false)
+	})
+	SetTransparent(false)
+}
+
+func TestTitleKeepsItsWidthWhateverTheTerminalCanColour(t *testing.T) {
+	// The title sits at the left of the tab bar, so a title that measured
+	// differently per terminal would shift every tab along with it.
+	const want = len(" cupstui ")
+	for _, p := range []termenv.Profile{termenv.TrueColor, termenv.ANSI256, termenv.ANSI, termenv.Ascii} {
+		t.Run(p.Name(), func(t *testing.T) {
+			withProfile(t, p)
+			if got := lipgloss.Width(titleView("cupstui")); got != want {
+				t.Errorf("width = %d, want %d", got, want)
+			}
+		})
+	}
+}
+
+func TestTitleFadesOnlyWhereThereAreColoursToFadeThrough(t *testing.T) {
+	withProfile(t, termenv.TrueColor)
+	faded := titleView("cupstui")
+
+	withProfile(t, termenv.ANSI256)
+	flat := titleView("cupstui")
+
+	if strings.Count(faded, "\x1b[") <= strings.Count(flat, "\x1b[") {
+		t.Error("24-bit colour should give the title a step per letter")
+	}
+	if flat != styleTitle.Render("cupstui") {
+		t.Error("below 24-bit the title should be the plain filled block")
+	}
+}
+
+func TestInkInvertsWithTheTheme(t *testing.T) {
+	// Every filled block — title, active tab, badge, banner — puts colorInk on
+	// a fill colour. The fills are dark on a light terminal and light on a dark
+	// one, so ink that did not invert would vanish into one of them.
+	if colorInk.Light == colorInk.Dark {
+		t.Fatal("colorInk has to differ between the themes")
+	}
+	if !strings.HasPrefix(colorInk.Light, "#f") || !strings.HasPrefix(colorInk.Dark, "#0") {
+		t.Errorf("colorInk = %+v, want light ink on the light theme's dark fills and the reverse", colorInk)
+	}
+}
