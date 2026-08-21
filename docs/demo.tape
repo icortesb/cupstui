@@ -79,8 +79,14 @@ Sleep 2s
 Type "s"
 Sleep 3s
 
-# The logs, tinted by level, and n to cycle to the next one.
+# The logs. cupsd repeats itself for pages at a time, so a run of the same
+# message is folded into one line with a count; v raises the level below which
+# nothing is shown, and n cycles to the next file.
 Type "6"
+Sleep 3s
+Type "v"
+Sleep 2s
+Type "v"
 Sleep 2500ms
 Type "n"
 Sleep 3s
