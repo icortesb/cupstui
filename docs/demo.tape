@@ -2,12 +2,13 @@
 #
 #   make demo
 #
-# The printers, the queue and the page log come from scripts/demo-fixture.sh,
-# which the Makefile runs around this tape.
+# Everything on screen belongs to the container the Makefile starts from
+# scripts/demo.Containerfile: its printers, its home directory, its page log.
+# The machine doing the recording never appears in the frame.
 
 Output docs/demo.gif
 
-Set Shell zsh
+Set Shell bash
 Set FontSize 15
 Set Width 1140
 Set Height 520
@@ -16,7 +17,10 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 45ms
 
 Hide
-Type "cd /tmp/cupstui-demo && clear" Enter
+Type "podman exec -it -e COLORTERM=truecolor cupstui-demo bash" Enter
+Sleep 2s
+Type "PS1='$ '" Enter
+Type "clear" Enter
 Show
 
 Type "cupstui" Enter

@@ -3,15 +3,21 @@
 #   scripts/demo-fixture.sh setup
 #   scripts/demo-fixture.sh teardown
 #
-# Print system for the demo recording. The queues point at a local socket that
-# throws the data away, so nothing reaches paper and the GIF does not depend on
-# whichever printer the machine happens to have. The jobs still complete, which
-# is what makes cupsd write the page_log the History tab reads.
+# Print system for the demo recording. Runs inside the container built from
+# scripts/demo.Containerfile — never against the machine's own CUPS, whose
+# printers, home directory and page log would end up in a published GIF.
+#
+# The queues point at a local socket that throws the data away, so nothing
+# reaches paper. The jobs still complete, which is what makes cupsd write the
+# page_log the History tab reads.
 
 set -euo pipefail
 
 readonly WORKDIR=/tmp/cupstui-demo
 readonly SINK_PORT=9100
+# Nothing listens here, which is the point: it is what a delivery failure is
+# made of.
+readonly DEAD_PORT=9101
 readonly PIDFILE="$WORKDIR/sink.pid"
 readonly CONFIG="$HOME/.config/cupstui/config.json"
 readonly BACKUP="$WORKDIR/config.bak"
@@ -19,11 +25,29 @@ readonly BACKUP="$WORKDIR/config.bak"
 readonly PRINTERS=(Office_Laser Reception_MFP)
 readonly DEFAULT_PRINTER=Office_Laser
 
+# Who the jobs belong to. Invented: a queue with one name in every row says
+# nothing about what the tool is for.
+readonly OWNERS=(ana marco sofia)
+
 # A PostScript driver rather than a raw queue: the text filter counts pages on
 # the way through, which is what puts real totals in page_log.
 readonly DRIVER=drv:///sample.drv/generic.ppd
 
 log() { printf '  %s\n' "$*" >&2; }
+
+start_cupsd() {
+	cupsd
+	for _ in $(seq 40); do
+		if lpstat -r >/dev/null 2>&1; then
+			log "cupsd running"
+			return 0
+		fi
+		sleep 0.25
+	done
+
+	log "cupsd never came up"
+	return 1
+}
 
 start_sink() {
 	# Without a listener the socket backend fails and cupsd disables the queue.
@@ -108,19 +132,19 @@ make_pdf() {
 
 print_history() {
 	local -a jobs=(
-		"Office_Laser|Q3 forecast|3"
-		"Office_Laser|meeting notes|1"
-		"Reception_MFP|invoice 4471|2"
-		"Reception_MFP|onboarding pack|4"
-		"Office_Laser|price list|2"
+		"Office_Laser|Q3 forecast|3|ana"
+		"Office_Laser|meeting notes|1|marco"
+		"Reception_MFP|invoice 4471|2|ana"
+		"Reception_MFP|onboarding pack|4|sofia"
+		"Office_Laser|price list|2|marco"
 	)
 
-	local entry printer title pages file
+	local entry printer title pages owner file
 	for entry in "${jobs[@]}"; do
-		IFS='|' read -r printer title pages <<<"$entry"
+		IFS='|' read -r printer title pages owner <<<"$entry"
 		file="$WORKDIR/$(echo "$title" | tr ' ' '_').pdf"
 		make_pdf "$file" "$title" "$pages"
-		lp -d "$printer" -t "$title" "$file" >/dev/null
+		lp -U "$owner" -d "$printer" -t "$title" "$file" >/dev/null
 	done
 
 	log "sent ${#jobs[@]} jobs for history, waiting for them to finish"
@@ -143,19 +167,49 @@ wait_for_empty_queue() {
 # which is the case the page log parser has to get right.
 hold_jobs() {
 	local -a titles=("annual report.pdf" "invoice.pdf" "receipt.pdf")
-	local title file
+	local title file i=0
 	for title in "${titles[@]}"; do
 		file="$WORKDIR/$title"
 		make_pdf "$file" "${title%.pdf}" 1
-		lp -H hold -d "$DEFAULT_PRINTER" -t "$title" "$file" >/dev/null
+		lp -U "${OWNERS[i++ % ${#OWNERS[@]}]}" -H hold \
+			-d "$DEFAULT_PRINTER" -t "$title" "$file" >/dev/null
 	done
 	log "queued ${#titles[@]} held jobs on $DEFAULT_PRINTER"
 }
 
+# One job that cannot be delivered, so error_log holds something above info.
+# The Logs tab filters by level, and a log of nothing but I lines has nothing
+# to show once the level is raised. The queue it fails on is taken away again:
+# what the recording needs is the lines it left behind, not a broken printer.
+seed_log_noise() {
+	local dead=Basement_Plotter file="$WORKDIR/undeliverable.pdf"
+
+	make_pdf "$file" "warranty claim" 1
+	lpadmin -p "$dead" -E -v "socket://127.0.0.1:$DEAD_PORT" -m "$DRIVER" 2>/dev/null
+	lp -U ana -d "$dead" -t "warranty claim" "$file" >/dev/null
+	lp -U marco -d "$dead" -t "shipping label" "$file" >/dev/null
+
+	local _
+	for _ in $(seq 40); do
+		if [[ $(grep -cE '^[EW] ' /var/log/cups/error_log) -ge 2 ]]; then
+			break
+		fi
+		sleep 0.5
+	done
+
+	cancel -a "$dead" 2>/dev/null || true
+	lpadmin -x "$dead" 2>/dev/null || true
+	log "left a failed delivery in error_log"
+}
+
+# Into the home directory rather than the work directory: the file browser
+# opens where the person running it lives, and an empty home makes for a dull
+# frame in the recording.
 seed_browsable_files() {
 	local f
+	mkdir -p "$HOME/Documents"
 	for f in "delivery note.pdf" "statement.pdf" "warranty.pdf"; do
-		make_pdf "$WORKDIR/$f" "${f%.pdf}" 1
+		make_pdf "$HOME/Documents/$f" "${f%.pdf}" 1
 	done
 }
 
@@ -178,10 +232,12 @@ restore_config() {
 setup() {
 	mkdir -p "$WORKDIR"
 	stub_config
+	start_cupsd
 	start_sink
 	add_printers
 	print_history
 	hold_jobs
+	seed_log_noise
 	seed_browsable_files
 	log "ready"
 }

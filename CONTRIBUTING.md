@@ -16,14 +16,18 @@ with no printing stack.
 ## Re-recording the demo
 
 ```sh
-make demo   # needs vhs, socat and ghostscript
+make demo   # needs vhs and podman
 ```
 
-`scripts/demo-fixture.sh` builds the print system the recording shows: two
+The recording runs inside a container built from `scripts/demo.Containerfile`,
+never against the machine's own CUPS: the GIF is published, and the printers,
+home directory and page log of whoever records it are nobody's business.
+Everything on screen is invented there by `scripts/demo-fixture.sh` — two
 queues pointed at a local socket that discards the data, a handful of completed
-jobs so the page log has rows, and three held jobs. Nothing reaches paper and no
-physical printer is needed. The Makefile runs the teardown from a trap, so the
-queues and `~/.config/cupstui/config.json` come back even if vhs fails partway.
+jobs so the page log has rows, three held jobs, one undeliverable one so the
+log has a warning in it, and a home directory for the file browser to open in.
+The Makefile removes the container from a trap, so nothing is left running even
+if vhs fails partway.
 
 ## Working on it
 
