@@ -34,7 +34,7 @@ func (p printersModel) selected(printers []cups.Printer) (cups.Printer, bool) {
 
 func (p printersModel) view(printers []cups.Printer, width int) string {
 	if len(printers) == 0 {
-		return styleDim.Render("  No printers configured on this CUPS server.")
+		return styleDim.Render("  No printers configured on this CUPS server.\n  Press A to add one.")
 	}
 
 	var b strings.Builder

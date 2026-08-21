@@ -732,6 +732,11 @@ func (m Model) handlePrintersKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Up):
 		m.printers.move(-1, n)
 		return m, nil
+
+	// Adding does not act on a printer, and a server with none is exactly
+	// where it is wanted: it has to come before the selection is required.
+	case key.Matches(msg, keys.AddPrinter):
+		return m, m.add.start(m.client)
 	}
 
 	p, ok := m.printers.selected(m.snap.Printers)
@@ -755,9 +760,6 @@ func (m Model) handlePrintersKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, action(fmt.Sprintf("%s set as default.", p.Name), func() error {
 			return c.SetDefault(p.Name)
 		})
-
-	case key.Matches(msg, keys.AddPrinter):
-		return m, m.add.start(m.client)
 
 	case key.Matches(msg, keys.Policy):
 		return m, m.policy.start(p)

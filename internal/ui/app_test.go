@@ -600,3 +600,20 @@ func TestUnknownSizeStillDraws(t *testing.T) {
 		t.Errorf("nothing drawn at an unknown size: %q", view)
 	}
 }
+
+// Adding a printer is the one thing a machine with no printers needs, so the
+// key that starts it cannot depend on there being one selected.
+func TestAddingAPrinterWorksWithAnEmptyList(t *testing.T) {
+	withColor(t)
+	m := testModel()
+	m.tab = tabPrinters
+	m.snap = cups.Snapshot{}
+	m.printers.clamp(0)
+
+	next, _ := m.Update(press("A"))
+	m = next.(Model)
+
+	if !m.add.active {
+		t.Fatal("A on the Printers tab must open the add screen even with no printers configured")
+	}
+}

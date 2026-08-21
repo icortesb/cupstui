@@ -13,7 +13,7 @@ import (
 // dashboardView shows one card per printer plus the queue summary.
 func dashboardView(snap cups.Snapshot, width int) string {
 	if len(snap.Printers) == 0 {
-		return styleDim.Render("  No printers configured on this CUPS server.")
+		return styleDim.Render("  No printers configured on this CUPS server.\n  Add one from the Printers tab with A.")
 	}
 
 	cards := make([]string, 0, len(snap.Printers))
