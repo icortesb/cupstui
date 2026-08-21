@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.13 — 2026-08-20
+
+- The tab content sits in a panel. It ran edge to edge with nothing but the
+  rule under the header between it and the navigation, and a screen with no
+  shape to it is harder to read at a glance than one with a frame.
+- The panel's border carries the focus. While a filter is being typed the keys
+  go to the field rather than the list underneath, and until now only the
+  cursor in the field said so.
+- Column headers on the Queue and the History take the accent colour, which is
+  what makes a row of names read as a header rather than as another row.
+- The demo recording moved into a container of its own. The GIF on the README
+  was recorded against a real machine and showed its printer by hostname, its
+  owner on every job, and the whole of their home directory in the file
+  browser. Nothing in the new one belongs to anybody: `make demo` now wants
+  podman instead of a running CUPS.
+
 ## v0.1.12 — 2026-08-20
 
 - The Logs tab folds a run of the same message into one line with a count.
