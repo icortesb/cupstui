@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.14 — 2026-08-21
+
+- `A` adds a printer on a server that has none. The Printers tab required a
+  selected printer before it read the key, so on an empty list the shortcut
+  the footer advertised did nothing — on the one kind of machine where adding
+  a printer is the only thing left to do.
+- Both empty states say where the add is: the Printers tab names the key, and
+  the Dashboard, which has no add of its own, points at the Printers tab.
+
 ## v0.1.13 — 2026-08-20
 
 - The tab content sits in a panel. It ran edge to edge with nothing but the
