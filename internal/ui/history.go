@@ -49,7 +49,7 @@ func (h *historyModel) restyle() {
 		BorderForeground(colorMuted).
 		BorderBottom(true).
 		Bold(true).
-		Foreground(colorMuted).
+		Foreground(colorAccent).
 		Padding(0, 1)
 	s.Cell = base().Foreground(colorText).Padding(0, 1)
 	s.Selected = base().Foreground(colorAccent).Bold(true)

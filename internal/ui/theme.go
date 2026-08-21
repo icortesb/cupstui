@@ -55,6 +55,7 @@ var (
 	styleTabActive   lipgloss.Style
 	styleTabInactive lipgloss.Style
 	styleHeaderBar   lipgloss.Style
+	styleBody        lipgloss.Style
 	styleStatusBar   lipgloss.Style
 	styleStatusOK    lipgloss.Style
 	styleStatusErr   lipgloss.Style
@@ -160,10 +161,14 @@ func buildStyles() {
 		Background(colorWarn).
 		Padding(0, 1)
 
-	styleHeaderBar = base().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(colorMuted)
+	// No rule of its own: the body panel's top border is the line under the
+	// header, and two adjacent rules read as a seam rather than a divider.
+	styleHeaderBar = base()
+
+	styleBody = base().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(colorMuted).
+		Padding(0, 1)
 
 	styleStatusBar = base().Foreground(colorMuted).Padding(0, 1)
 	styleStatusOK = base().Foreground(colorOK).Bold(true).Padding(0, 1)
@@ -194,7 +199,7 @@ func buildStyles() {
 
 	if !transparent {
 		styleCard = styleCard.BorderBackground(colorBG)
-		styleHeaderBar = styleHeaderBar.BorderBackground(colorBG)
+		styleBody = styleBody.BorderBackground(colorBG)
 	}
 }
 

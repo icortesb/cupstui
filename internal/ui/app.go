@@ -831,19 +831,20 @@ func describeError(err error) string {
 
 // resize shares the window size out among the views.
 func (m *Model) resize() {
-	body := m.bodyHeight()
-	m.queue.setSize(m.width, body-2)
-	m.logs.setSize(m.width, body-2)
-	m.print.setSize(m.width, body-2)
-	m.history.setSize(m.width, body-2)
-	m.add.setSize(m.width, body)
-	m.diagnose.setSize(m.width, body)
-	m.policy.setSize(m.width)
+	body := m.contentHeight()
+	width := m.contentWidth()
+	m.queue.setSize(width, body-2)
+	m.logs.setSize(width, body-2)
+	m.print.setSize(width, body-2)
+	m.history.setSize(width, body-2)
+	m.add.setSize(width, body)
+	m.diagnose.setSize(width, body)
+	m.policy.setSize(width)
 	m.preflight.setSize(m.width)
-	m.password.setSize(m.width)
-	m.helpVP.Width = m.width
+	m.password.setSize(width)
+	m.helpVP.Width = width
 	m.helpVP.Height = body
-	m.helpVP.SetContent(helpView(m.width))
+	m.helpVP.SetContent(helpView(width))
 }
 
 // offerSignIn asks for a password when a remote server refuses and none has
@@ -905,13 +906,13 @@ func (m *Model) restyle() {
 	m.add.restyle()
 	m.policy.restyle()
 	m.password.restyle()
-	m.helpVP.SetContent(helpView(m.width))
+	m.helpVP.SetContent(helpView(m.contentWidth()))
 }
 
-// bodyHeight is what is left for the content: the header takes two lines
-// (title and border), the footer one, and the banner another when present.
+// bodyHeight is the height of the body panel, borders included: the header
+// takes one line, the footer one, and the banner another when present.
 func (m Model) bodyHeight() int {
-	h := m.height - 3
+	h := m.height - 2
 	if m.err != nil {
 		h--
 	}
@@ -919,6 +920,49 @@ func (m Model) bodyHeight() int {
 		h = 3
 	}
 	return h
+}
+
+// contentHeight is what is left inside the panel once its top and bottom
+// borders are taken off.
+func (m Model) contentHeight() int {
+	h := m.bodyHeight() - 2
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+// contentWidth is the room inside the panel: two columns for the borders and
+// two more for the padding that keeps the text off them.
+func (m Model) contentWidth() int {
+	w := m.width - 4
+	if w < 1 {
+		// A width not known yet is not a narrow screen; the views are told the
+		// screen width and resized as soon as a real one arrives.
+		w = m.width
+	}
+	return w
+}
+
+// panelWidth is what lipgloss has to be given for the panel: it counts the
+// padding inside the width but adds the border on top of it.
+func (m Model) panelWidth() int {
+	w := m.width - 2
+	if w < 1 {
+		w = m.width
+	}
+	return w
+}
+
+// bodyStyle is the panel around the body. Its border carries the focus: while a
+// filter is being typed the keys go to the field rather than the list, and the
+// border says so.
+func (m Model) bodyStyle() lipgloss.Style {
+	s := styleBody
+	if m.queue.filtering || m.history.filtering {
+		s = s.BorderForeground(colorAccent)
+	}
+	return s
 }
 
 // fit keeps the screen within the terminal. A line wider than the screen is
@@ -960,8 +1004,9 @@ func (m Model) View() string {
 	}
 
 	body := m.bodyView()
-	b.WriteString(styleApp.
-		Height(m.bodyHeight()).
+	b.WriteString(m.bodyStyle().
+		Width(m.panelWidth()).
+		Height(m.contentHeight()).
 		MaxHeight(m.bodyHeight()).
 		Render(body))
 	b.WriteString("\n")
@@ -1099,15 +1144,15 @@ func (m Model) bodyView() string {
 	case tabQueue:
 		return m.queue.view(len(m.snap.Jobs))
 	case tabPrinters:
-		return m.printers.view(m.snap.Printers, m.width)
+		return m.printers.view(m.snap.Printers, m.contentWidth())
 	case tabPrint:
 		return m.print.view(m.snap.Printers, m.snap.Default)
 	case tabHistory:
 		return m.history.view()
 	case tabLogs:
-		return m.logs.view(m.width)
+		return m.logs.view(m.contentWidth())
 	default:
-		return dashboardView(m.snap, m.width)
+		return dashboardView(m.snap, m.contentWidth())
 	}
 }
 
